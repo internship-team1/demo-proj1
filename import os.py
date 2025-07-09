@@ -71,5 +71,5 @@ def file_to_text(filepath: str) -> str:
     else:
         raise ValueError(f'不支持的文件类型: {ext}')
     
-text = file_to_text('D:/example.pdf')  # 替换为你的文件路径
+text = file_to_text('D:/example.jpg')  # 替换为你的文件路径
 print(text)
