@@ -1,0 +1,193 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// 现有的表（保留）
+model playing_with_neon {
+  id    Int    @id @default(autoincrement())
+  name  String
+  value Float? @db.Real
+}
+
+model products {
+  id           Int      @id @default(autoincrement())
+  image_url    String
+  name         String
+  status       status
+  price        Decimal  @db.Decimal(10, 2)
+  stock        Int
+  available_at DateTime @db.Timestamp(6)
+}
+
+// 用户表（已创建，进行扩展）
+model users {
+  id        Int      @id @default(autoincrement())
+  username  String   @unique
+  password  String
+  role      String   // "admin", "organizer", "speaker", "audience"
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // 关系字段
+  organizedCourses    Course[]        @relation("CourseOrganizer")
+  presentedCourses    Course[]        @relation("CourseSpeaker")
+  enrolledCourses     CourseMember[]
+  uploadedFiles       File[]
+  submittedAnswers    Answer[]
+  comments            Comment[]
+
+  @@map("quiz_users")
+}
+
+// 课程表
+model Course {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  courseCode  String   @unique // 课程码，用于听众加入
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关系字段
+  organizerId Int
+  organizer   users          @relation("CourseOrganizer", fields: [organizerId], references: [id])
+  speakerId   Int?
+  speaker     users?         @relation("CourseSpeaker", fields: [speakerId], references: [id])
+  members     CourseMember[]
+  files       File[]
+  quizzes     Quiz[]
+  comments    Comment[]      @relation("CourseComments")
+
+  @@map("courses")
+}
+
+// 课程成员表（记录听众加入的课程）
+model CourseMember {
+  id        Int      @id @default(autoincrement())
+  courseId  Int
+  userId    Int
+  joinedAt  DateTime @default(now())
+  
+  // 关系字段
+  course    Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  user      users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([courseId, userId])
+  @@map("course_members")
+}
+
+// 文件表（上传的演讲材料）
+model File {
+  id          Int       @id @default(autoincrement())
+  filename    String
+  fileType    String    // "text", "audio", "video", "presentation"
+  fileUrl     String
+  uploadedAt  DateTime  @default(now())
+  
+  // 关系字段
+  courseId    Int
+  course      Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  uploaderId  Int
+  uploader    users     @relation(fields: [uploaderId], references: [id])
+  quiz        Quiz?
+
+  @@map("files")
+}
+
+// 问卷表
+model Quiz {
+  id              Int       @id @default(autoincrement())
+  title           String
+  description     String?
+  startTime       DateTime? // 开始答题时间
+  endTime         DateTime? // 结束答题时间
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  
+  // 关系字段
+  courseId        Int
+  course          Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  fileId          Int       @unique
+  file            File      @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  answers         Answer[]
+  comments        Comment[] @relation("QuizComments")
+
+  @@map("quizzes")
+}
+
+// 问题表
+model Question {
+  id          Int       @id @default(autoincrement())
+  content     String
+  correctOptionId Int?
+  
+  // 关系字段
+  quizId      Int
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  options     Option[]
+  answers     Answer[]
+
+  @@map("questions")
+}
+
+// 选项表
+model Option {
+  id          Int       @id @default(autoincrement())
+  content     String
+  isCorrect   Boolean   @default(false)
+  
+  // 关系字段
+  questionId  Int
+  question    Question  @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answers     Answer[]
+
+  @@map("options")
+}
+
+// 答题记录表
+model Answer {
+  id          Int       @id @default(autoincrement())
+  answeredAt  DateTime  @default(now())
+  
+  // 关系字段
+  quizId      Int
+  quiz        Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  questionId  Int
+  question    Question  @relation(fields: [questionId], references: [id])
+  optionId    Int
+  selectedOption Option  @relation(fields: [optionId], references: [id])
+  userId      Int
+  user        users     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, questionId, quizId])
+  @@map("answers")
+}
+
+// 留言表
+model Comment {
+  id          Int       @id @default(autoincrement())
+  content     String
+  createdAt   DateTime  @default(now())
+  
+  // 关系字段
+  userId      Int
+  user        users     @relation(fields: [userId], references: [id])
+  courseId    Int?
+  course      Course?   @relation("CourseComments", fields: [courseId], references: [id])
+  quizId      Int?
+  quiz        Quiz?     @relation("QuizComments", fields: [quizId], references: [id])
+
+  @@map("comments")
+}
+
+enum status {
+  active
+  inactive
+  archived
+}
