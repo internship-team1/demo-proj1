@@ -72,13 +72,19 @@ git pull
 ```bash
 npx prisma migrate dev
 ```
+```bash
+npx prisma generate
+```
 - 每次开发完成后也要迁移数据，之后才能提交和推送
 ```bash
 npx prisma migrate dev
 ```
+```bash
+npx prisma generate
+```
 - 完成一个功能可以正常运行后才能推送到仓库，否则其他队员在开发时无法确定是自己的代码有问题还是别人的有问题
 - 命令ai辅助编程时使用步骤化精细化的命令，不要只是笼统的概括
-- 项目已部署到平台，推送到 Git 仓库后会自动更新，使用群里的网址查看已开发的功能是否正常以及总体进度
+- 项目已部署，推送到 Git 仓库后会自动更新，https://popquiz-nine.vercel.app/ 查看已开发的功能是否正常以及总体进度
 
 ## 项目结构
 
