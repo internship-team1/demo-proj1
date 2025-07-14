@@ -155,9 +155,7 @@ export default function OrganizerPage() {
       return;
     }
     const generateCourseCode = () => {
-      const prefix = courseTitle.substring(0, 3).toUpperCase();
-      const randomNum = Math.floor(1000 + Math.random() * 9000);
-      return `${prefix}${randomNum}`;
+      return Math.random().toString().slice(2, 8); // 生成6位纯随机数字字符串
     };
     const newCourse = {
       title: courseTitle,
