@@ -35,11 +35,7 @@ export default function OrganizerPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   
   // Course state
-  const [courses, setCourses] = useState<Course[]>([
-    { id: 1, title: "Web开发基础", organizer: "组织者1", members: 42, courseCode: "WEB001" },
-    { id: 2, title: "数据结构与算法", organizer: "组织者1", members: 36, courseCode: "DSA002" },
-    { id: 3, title: "用户体验设计", organizer: "组织者1", members: 28, courseCode: "UXD003" },
-  ]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [courseTitle, setCourseTitle] = useState("");
   const [message, setMessage] = useState("");
   
@@ -142,43 +138,61 @@ export default function OrganizerPage() {
     setSelectedQuiz(null);
   }, [selectedCourse]);
 
-  const handleCreateCourse = () => {
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  // 创建课程
+  const fetchCourses = async () => {
+    const res = await fetch("/api/course");
+    const data = await res.json();
+    console.log("课程数据", data);
+    setCourses(Array.isArray(data) ? data : []);
+  };
+  const handleCreateCourse = async () => {
     if (!courseTitle.trim()) {
       setMessage("请输入课程标题");
       return;
     }
-    
-    // 生成随机课程码
     const generateCourseCode = () => {
       const prefix = courseTitle.substring(0, 3).toUpperCase();
-      const randomNum = Math.floor(1000 + Math.random() * 9000); // 生成1000-9999之间的随机数
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
       return `${prefix}${randomNum}`;
     };
-    
-    const newCourse: Course = {
-      id: Date.now(),
+    const newCourse = {
       title: courseTitle,
-      organizer: currentUser?.username || "未知组织者",
-      members: 0,
-      courseCode: generateCourseCode()
+      description: "", // 可加输入框让用户填写
+      organizerId: currentUser?.id, // 必须是id
+      courseCode: generateCourseCode(),
     };
-    
-    setCourses([...courses, newCourse]);
-    setCourseTitle("");
-    setMessage(`成功创建课程: ${newCourse.title}`);
-    
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
+    const res = await fetch("/api/course", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newCourse),
+    });
+    if (res.ok) {
+      setMessage(`成功创建课程: ${courseTitle}`);
+      setCourseTitle("");
+      fetchCourses(); // 刷新课程列表
+    } else {
+      setMessage("创建课程失败");
+    }
+    setTimeout(() => setMessage(""), 3000);
   };
   
-  const handleDeleteCourse = (id: number) => {
-    setCourses(courses.filter(course => course.id !== id));
-    setMessage("课程已删除");
-    
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
+  const handleDeleteCourse = async (id: number) => {
+    const res = await fetch("/api/course", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    if (res.ok) {
+      setMessage("课程已删除");
+      fetchCourses(); // 删除后刷新课程列表
+    } else {
+      setMessage("删除失败");
+    }
+    setTimeout(() => setMessage(""), 3000);
   };
   
   const handleManageCourse = (courseId: number) => {
@@ -370,7 +384,7 @@ export default function OrganizerPage() {
             
             {/* 课程列表 */}
             <div className="flex-1 overflow-auto">
-              {courses.length > 0 ? (
+              {Array.isArray(courses) && courses.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2">
                   {courses.map(course => (
                     <div key={course.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
