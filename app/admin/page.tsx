@@ -33,6 +33,12 @@ export default function AdminPage() {
   
   const router = useRouter();
   const [isRedirecting, setIsRedirecting] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [newUsername, setNewUsername] = useState("");
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [settingsMessage, setSettingsMessage] = useState("");
 
   useEffect(() => {
     // 防止重定向循环
@@ -56,11 +62,24 @@ export default function AdminPage() {
         if (user.role !== "admin") {
           setIsRedirecting(true);
           router.push("/?from=admin");
+          return;
         }
+        setCurrentUser(user);
+        setNewUsername(user.username);
       } catch (error) {
         setIsRedirecting(true);
         router.push("/?from=admin");
       }
+    } else if (admin) {
+      // 如果有admin但没有currentUser，创建一个默认的currentUser
+      const defaultAdminUser = {
+        id: 0,
+        username: "admin",
+        role: "admin",
+        password: "admin123" // 仅作示例，实际应用中不应存储明文密码
+      };
+      setCurrentUser(defaultAdminUser);
+      setNewUsername(defaultAdminUser.username);
     }
   }, [router, isRedirecting]);
 
@@ -69,7 +88,7 @@ export default function AdminPage() {
     localStorage.removeItem("currentUser");
     router.push("/");
   };
-
+  
   const deleteUser = (id: number) => {
     setUsers(users.filter(user => user.id !== id));
   };
@@ -77,6 +96,60 @@ export default function AdminPage() {
   const deleteCourse = (id: number) => {
     setCourses(courses.filter(course => course.id !== id));
   };
+
+  const handleUpdateUsername = () => {
+    if (!newUsername.trim()) {
+      setSettingsMessage("用户名不能为空");
+      return;
+    }
+
+    // 更新用户名
+    const updatedUser = { ...currentUser, username: newUsername };
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+    setCurrentUser(updatedUser);
+    setSettingsMessage("用户名更新成功");
+    
+    // 3秒后清除消息
+    setTimeout(() => {
+      setSettingsMessage("");
+    }, 3000);
+  };
+
+  const handleUpdatePassword = () => {
+    // 简单的密码验证
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      setSettingsMessage("请填写所有密码字段");
+      return;
+    }
+
+    if (currentPassword !== currentUser.password) {
+      setSettingsMessage("当前密码不正确");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setSettingsMessage("两次输入的新密码不一致");
+      return;
+    }
+
+    // 更新密码
+    const updatedUser = { ...currentUser, password: newPassword };
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+    setCurrentUser(updatedUser);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setSettingsMessage("密码更新成功");
+    
+    // 3秒后清除消息
+    setTimeout(() => {
+      setSettingsMessage("");
+    }, 3000);
+  };
+
+  if (!currentUser) {
+    return <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800">加载中...</div>;
+  }
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800">
@@ -102,6 +175,14 @@ export default function AdminPage() {
                 onClick={() => setActiveTab("courses")}
               >
                 课程管理
+              </button>
+            </li>
+            <li>
+              <button 
+                className={`w-full p-3 text-left rounded-md transition-colors ${activeTab === "settings" ? "bg-gray-100 text-gray-800 font-medium border-l-4 border-gray-400" : "text-gray-600 hover:bg-gray-50"}`}
+                onClick={() => setActiveTab("settings")}
+              >
+                设置
               </button>
             </li>
           </ul>
@@ -152,7 +233,7 @@ export default function AdminPage() {
               </table>
             </div>
           </div>
-        ) : (
+        ) : activeTab === "courses" ? (
           <div>
             <h2 className="text-2xl font-bold mb-6 text-gray-800">课程管理</h2>
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -187,8 +268,78 @@ export default function AdminPage() {
               </table>
             </div>
           </div>
+        ) : (
+          <div>
+            <h2 className="text-2xl font-bold mb-6 text-gray-800">设置</h2>
+            
+            {/* 更新用户名 */}
+            <div className="mb-8 p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-lg font-medium mb-4 text-gray-800">更新用户名</h3>
+              <div className="flex space-x-3">
+                <input 
+                  type="text" 
+                  placeholder="新用户名" 
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
+                />
+                <button 
+                  className="px-4 py-2 bg-transparent text-gray-800 rounded-md hover:bg-gray-100 transition-colors border border-gray-300"
+                  onClick={handleUpdateUsername}
+                >
+                  更新
+                </button>
+              </div>
+            </div>
+            
+            {/* 更新密码 */}
+            <div className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm">
+              <h3 className="text-lg font-medium mb-4 text-gray-800">更新密码</h3>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">当前密码</label>
+                  <input 
+                    type="password" 
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">新密码</label>
+                  <input 
+                    type="password" 
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">确认新密码</label>
+                  <input 
+                    type="password" 
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-800 focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-gray-400"
+                  />
+                </div>
+                <button 
+                  className="px-4 py-2 bg-transparent text-gray-800 rounded-md hover:bg-gray-100 transition-colors border border-gray-300"
+                  onClick={handleUpdatePassword}
+                >
+                  更新密码
+                </button>
+              </div>
+            </div>
+            
+            {settingsMessage && (
+              <p className={`mt-4 text-sm ${settingsMessage.includes("成功") ? "text-green-600" : "text-red-600"}`}>
+                {settingsMessage}
+              </p>
+            )}
+          </div>
         )}
       </div>
     </div>
   );
-} 
+}
