@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
 import { prisma } from "@/app/lib/prisma";
 
-export async function GET(req: Request, { params }: { params: { courseId: string } }) {
+
+export async function GET(req: NextRequest, { params }: { params: { courseId: string } }) {
   const courseId = Number(params.courseId);
   if (!courseId) return NextResponse.json({ error: "缺少课程ID" }, { status: 400 });
 
