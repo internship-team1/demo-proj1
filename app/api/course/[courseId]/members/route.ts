@@ -3,8 +3,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 
 
-export async function GET(req: NextRequest, { params }: { params: { courseId: string } }) {
-  const courseId = Number(params.courseId);
+export async function GET(req: NextRequest) {
+  // 从 URL 中解析 courseId
+  const url = new URL(req.url);
+  const pathParts = url.pathname.split("/");
+  const courseIdStr = pathParts[pathParts.indexOf("course") + 1];
+  const courseId = Number(courseIdStr);
+
   if (!courseId) return NextResponse.json({ error: "缺少课程ID" }, { status: 400 });
 
   // 查询该课程所有成员及其用户信息
