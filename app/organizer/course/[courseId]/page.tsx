@@ -66,11 +66,14 @@ export default function CourseManagementPage() {
       // 获取课程成员（听众）
       fetch(`/api/course/${courseId}/members`)
         .then(res => res.json())
-        .then((data: (User & { isSpeaker?: boolean })[]) => {
+        .then((data: User[]) => {
           setMembers(data);
+          // 设置当前演讲者
           const currentSpeaker = data.find(m => m.isSpeaker);
           if (currentSpeaker) {
             setSpeakerUsername(currentSpeaker.username);
+          } else {
+            setSpeakerUsername("");
           }
         })
         .catch(() => setMembers([]));
@@ -113,74 +116,61 @@ export default function CourseManagementPage() {
       setMessage("请输入用户名");
       return;
     }
-    
-    // 检查用户是否已在课程成员中
-    const userExists = members.some(m => m.username === speakerUsername);
-    let updatedMembers;
-    
-    if (userExists) {
-      // 如果用户已存在，只更新演讲者状态
-      updatedMembers = members.map(member => ({
-        ...member,
-        isSpeaker: member.username === speakerUsername
-      }));
-    } else {
-      // 如果用户不存在，添加新用户并设为演讲者
-      const newMember = {
-        id: Date.now(), // 生成唯一ID
-        username: speakerUsername,
-        role: "audience", // 默认角色为听众
-        isSpeaker: true  // 设为演讲者
-      };
-      
-      // 将其他成员的演讲者状态设为false，新成员设为true
-      updatedMembers = members.map(member => ({
-        ...member,
-        isSpeaker: false
-      }));
-      updatedMembers.push(newMember);
-      
-      // 更新课程成员数量
-      if (course) {
-        const updatedCourse = { ...course, members: updatedMembers.length };
-        setCourse(updatedCourse);
-      }
+
+    // 先查找该用户名对应的 userId
+    const member = members.find(m => m.username === speakerUsername);
+    if (!member) {
+      setMessage("该用户名不是本课程成员，请先让其加入课程");
+      return;
     }
-    
-    setMembers(updatedMembers);
-    setMessage(`已将 "${speakerUsername}" 设置为演讲者`);
-    
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
-    
+
     try {
+      // 设置演讲者
       await fetch("/api/course", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: courseId, speakerId: updatedMembers.find(m => m.isSpeaker)?.id }),
+        body: JSON.stringify({ id: courseId, speakerId: member.id }),
       });
+
+      setMessage(`已将 "${speakerUsername}" 设置为演讲者`);
+
+      // 重新获取成员列表，刷新 isSpeaker 状态
+      const res = await fetch(`/api/course/${courseId}/members`);
+      const data = await res.json();
+      setMembers(data);
+
+      setTimeout(() => {
+        setMessage("");
+      }, 3000);
     } catch (error) {
       setMessage("设置演讲者时出错");
     }
   };
   
-  const handleRemoveMember = (userId: number) => {
-    // 移除成员
-    const updatedMembers = members.filter(member => member.id !== userId);
-    setMembers(updatedMembers);
-    
-    // 更新课程成员数量
-    if (course) {
-      const updatedCourse = { ...course, members: updatedMembers.length };
-      setCourse(updatedCourse);
+  const handleRemoveMember = async (userId: number) => {
+    try {
+      // 调用后端API移除成员
+      await fetch(`/api/course/${courseId}/members`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ courseId, userId }),
+      });
+      setMessage("成员已移除");
+      // 刷新成员列表
+      const res = await fetch(`/api/course/${courseId}/members`);
+      const data = await res.json();
+      setMembers(data);
+      // 更新课程成员数量
+      if (course) {
+        const updatedCourse = { ...course, members: data.length };
+        setCourse(updatedCourse);
+      }
+      setTimeout(() => {
+        setMessage("");
+      }, 3000);
+    } catch (error) {
+      setMessage("移除成员时出错");
     }
-    
-    setMessage("成员已移除");
-    
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
   };
   
   const handleGoBack = () => {
