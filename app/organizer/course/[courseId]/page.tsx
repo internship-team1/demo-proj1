@@ -117,28 +117,50 @@ export default function CourseManagementPage() {
       return;
     }
 
-    // 先查找该用户名对应的 userId
-    const member = members.find(m => m.username === speakerUsername);
+    // 查找该用户名对应的 userId
+    let member = members.find(m => m.username === speakerUsername);
+    let newMemberAdded = false;
     if (!member) {
-      setMessage("该用户名不是本课程成员，请先让其加入课程");
-      return;
+      // 不存在则先添加成员
+      try {
+        const addRes = await fetch(`/api/course/${courseId}/members`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: speakerUsername }),
+        });
+        if (!addRes.ok) {
+          setMessage("添加成员失败，请检查用户名是否有效");
+          return;
+        }
+        newMemberAdded = true;
+      } catch (error) {
+        setMessage("添加成员时出错");
+        return;
+      }
     }
 
     try {
+      // 重新获取成员列表，确保有最新成员
+      const res = await fetch(`/api/course/${courseId}/members`);
+      const data: User[] = await res.json();
+      setMembers(data);
+      // 查找新成员
+      member = data.find(m => m.username === speakerUsername);
+      if (!member) {
+        setMessage("添加成员后仍未找到该用户");
+        return;
+      }
       // 设置演讲者
       await fetch("/api/course", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: courseId, speakerId: member.id }),
       });
-
-      setMessage(`已将 "${speakerUsername}" 设置为演讲者`);
-
-      // 重新获取成员列表，刷新 isSpeaker 状态
-      const res = await fetch(`/api/course/${courseId}/members`);
-      const data = await res.json();
-      setMembers(data);
-
+      setMessage(`已将 \"${speakerUsername}\" 设置为演讲者${newMemberAdded ? "（已自动加入课程）" : ""}`);
+      // 再次刷新成员列表，刷新 isSpeaker 状态
+      const res2 = await fetch(`/api/course/${courseId}/members`);
+      const data2 = await res2.json();
+      setMembers(data2);
       setTimeout(() => {
         setMessage("");
       }, 3000);
