@@ -48,45 +48,39 @@ export default function CourseManagementPage() {
       }
       setCurrentUser(user);
       
-             // 模拟从API加载课程数据
-       // 实际应用中应该从API获取
-       const mockCourses = [
-         { id: 1, title: "Web开发基础", organizer: "组织者1", members: 42, courseCode: "WEB001" },
-         { id: 2, title: "数据结构与算法", organizer: "组织者1", members: 36, courseCode: "DSA002" },
-         { id: 3, title: "用户体验设计", organizer: "组织者1", members: 28, courseCode: "UXD003" },
-       ];
+      // 用API获取课程数据
+      fetch(`/api/course?id=${courseId}`)
+        .then(res => res.json())
+        .then(data => {
+          // 如果 data 是数组，找出对应课程
+          const found = Array.isArray(data) ? data.find(c => c.id === courseId) : data;
+          if (found && found.id === courseId) {
+            setCourse(found);
+            setCourseTitle(found.title);
+          } else {
+            router.push("/organizer");
+          }
+        })
+        .catch(() => router.push("/organizer"));
       
-      const foundCourse = mockCourses.find(c => c.id === courseId);
-      if (foundCourse) {
-        setCourse(foundCourse);
-        setCourseTitle(foundCourse.title);
-      } else {
-        router.push("/organizer");
-      }
-      
-      // 模拟成员数据
-      const mockMembers = [
-        { id: 101, username: "学生A", role: "audience" },
-        { id: 102, username: "学生B", role: "audience" },
-        { id: 103, username: "学生C", role: "audience", isSpeaker: true },
-        { id: 104, username: "学生D", role: "audience" },
-        { id: 105, username: "学生E", role: "audience" },
-      ];
-      
-      setMembers(mockMembers);
-      
-      // 设置当前演讲者
-      const currentSpeaker = mockMembers.find(m => m.isSpeaker);
-      if (currentSpeaker) {
-        setSpeakerUsername(currentSpeaker.username);
-      }
+      // 获取课程成员（听众）
+      fetch(`/api/course/${courseId}/members`)
+        .then(res => res.json())
+        .then((data: (User & { isSpeaker?: boolean })[]) => {
+          setMembers(data);
+          const currentSpeaker = data.find(m => m.isSpeaker);
+          if (currentSpeaker) {
+            setSpeakerUsername(currentSpeaker.username);
+          }
+        })
+        .catch(() => setMembers([]));
       
     } catch (error) {
       router.push("/organizer");
     }
   }, [router, courseId]);
 
-  const handleUpdateCourse = () => {
+  const handleUpdateCourse = async () => {
     if (!courseTitle.trim()) {
       setMessage("课程标题不能为空");
       return;
@@ -101,10 +95,20 @@ export default function CourseManagementPage() {
       setTimeout(() => {
         setMessage("");
       }, 3000);
+      
+      try {
+        await fetch("/api/course", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: courseId, title: courseTitle }),
+        });
+      } catch (error) {
+        setMessage("更新课程名称时出错");
+      }
     }
   };
   
-  const handleSetSpeaker = () => {
+  const handleSetSpeaker = async () => {
     if (!speakerUsername.trim()) {
       setMessage("请输入用户名");
       return;
@@ -149,6 +153,16 @@ export default function CourseManagementPage() {
     setTimeout(() => {
       setMessage("");
     }, 3000);
+    
+    try {
+      await fetch("/api/course", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: courseId, speakerId: updatedMembers.find(m => m.isSpeaker)?.id }),
+      });
+    } catch (error) {
+      setMessage("设置演讲者时出错");
+    }
   };
   
   const handleRemoveMember = (userId: number) => {
