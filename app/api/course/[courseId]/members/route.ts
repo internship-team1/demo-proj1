@@ -59,3 +59,37 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "移除成员失败" }, { status: 500 });
   }
 }
+
+export async function POST(req: NextRequest) {
+  // 从 URL 和 body 获取参数
+  const url = new URL(req.url);
+  const pathParts = url.pathname.split("/");
+  const courseIdStr = pathParts[pathParts.indexOf("course") + 1];
+  const courseId = Number(courseIdStr);
+
+  const { username } = await req.json();
+  if (!courseId || !username) {
+    return NextResponse.json({ error: "缺少参数" }, { status: 400 });
+  }
+
+  // 查找用户
+  const user = await prisma.users.findUnique({ where: { username } });
+  if (!user) {
+    return NextResponse.json({ error: "用户不存在" }, { status: 404 });
+  }
+
+  // 检查是否已是成员
+  const exist = await prisma.courseMember.findUnique({
+    where: { courseId_userId: { courseId, userId: user.id } }
+  });
+  if (exist) {
+    return NextResponse.json({ error: "已是成员" }, { status: 409 });
+  }
+
+  // 添加成员
+  await prisma.courseMember.create({
+    data: { courseId, userId: user.id }
+  });
+
+  return NextResponse.json({ success: true });
+}
