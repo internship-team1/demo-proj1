@@ -49,6 +49,10 @@ export default function AudiencePage() {
   useEffect(() => {
     // 检查本地存储中是否有用户信息
     const savedUser = localStorage.getItem('currentUser');
+    if (savedUser) {
+    const user = JSON.parse(savedUser);
+    setNewUsername(user.username); // 初始化表单用户名
+    //const savedUser = localStorage.getItem('currentUser');
     if (!savedUser) {
       router.push("/");
       return;
@@ -67,7 +71,7 @@ export default function AudiencePage() {
       localStorage.removeItem('currentUser');
       router.push("/");
     }
-  }, [router]);
+  }}, [router]);
 
   const handleJoinCourse = () => {
     if (!courseCode.trim()) {
@@ -149,56 +153,85 @@ export default function AudiencePage() {
     return comment.userId === (currentUser.id || currentUser.username);
   };
 
-  const handleUpdateUsername = () => {
-    if (!newUsername.trim()) {
-      setSettingsMessage("用户名不能为空");
-      return;
-    }
+const handleUpdateUsername = async () => {
+  if (!newUsername.trim()) {
+    setSettingsMessage("请输入新用户名");
+    return;
+  }
 
-    // 更新用户名
-    const updatedUser = { ...currentUser, username: newUsername };
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    setCurrentUser(updatedUser);
-    setSettingsMessage("用户名更新成功");
+  try {
+    const response = await fetch('/api/profile/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        newUsername: newUsername.trim()
+      })
+    });
+
+    const result = await response.json();
     
-    // 3秒后清除消息
-    setTimeout(() => {
-      setSettingsMessage("");
-    }, 3000);
-  };
-
-  const handleUpdatePassword = () => {
-    // 简单的密码验证
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setSettingsMessage("请填写所有密码字段");
-      return;
+    if (result.success) {
+      // 更新本地存储和状态
+      const updatedUser = { 
+        ...currentUser, 
+        username: result.user.username 
+      };
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+      setSettingsMessage("用户名更新成功！");
+      
+      // 3秒后清除消息
+      setTimeout(() => {
+        setSettingsMessage("");
+      }, 3000);
+    } else {
+      setSettingsMessage(result.message || "更新用户名失败");
     }
+  } catch (error) {
+    setSettingsMessage("网络错误，请稍后重试");
+  }
+};
+  const handleUpdatePassword = async () => {
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    setSettingsMessage("请填写所有密码字段");
+    return;
+  }
 
-    if (currentPassword !== currentUser.password) {
-      setSettingsMessage("当前密码不正确");
-      return;
+  if (newPassword !== confirmPassword) {
+    setSettingsMessage("两次输入的新密码不一致");
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/profile/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        currentPassword,
+        newPassword
+      })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      setSettingsMessage("密码更新成功！请重新登录");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      
+      // 3秒后自动登出
+      setTimeout(() => {
+        handleLogout();
+      }, 3000);
+    } else {
+      setSettingsMessage(result.message || "更新密码失败");
     }
-
-    if (newPassword !== confirmPassword) {
-      setSettingsMessage("两次输入的新密码不一致");
-      return;
-    }
-
-    // 更新密码
-    const updatedUser = { ...currentUser, password: newPassword };
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    setCurrentUser(updatedUser);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setSettingsMessage("密码更新成功");
-    
-    // 3秒后清除消息
-    setTimeout(() => {
-      setSettingsMessage("");
-    }, 3000);
-  };
-
+  } catch (error) {
+    setSettingsMessage("网络错误，请稍后重试");
+  }
+};
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
     router.push("/");
@@ -336,7 +369,7 @@ export default function AudiencePage() {
                 />
                 <button 
                   className="px-4 py-2 bg-transparent text-gray-800 rounded-md hover:bg-gray-100 transition-colors border border-gray-300"
-                  onClick={handleUpdateUsername}
+                  onClick={handleUpdateUsername}//
                 >
                   更新
                 </button>
@@ -376,7 +409,7 @@ export default function AudiencePage() {
                 </div>
                 <button 
                   className="px-4 py-2 bg-transparent text-gray-800 rounded-md hover:bg-gray-100 transition-colors border border-gray-300"
-                  onClick={handleUpdatePassword}
+                  onClick={handleUpdatePassword}//
                 >
                   更新密码
                 </button>

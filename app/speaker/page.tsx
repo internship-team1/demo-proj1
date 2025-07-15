@@ -177,52 +177,85 @@ export default function SpeakerPage() {
     router.push(`/speaker/quiz/${courseId}`);
   };
 
-  const handleUpdateUsername = () => {
-    if (!newUsername.trim()) {
-      setSettingsMessage("用户名不能为空");
-      return;
-    }
+  const handleUpdateUsername = async () => {
+  if (!newUsername.trim()) {
+    setSettingsMessage("请输入新用户名");
+    return;
+  }
 
-    // 更新用户名
-    const updatedUser = { ...currentUser, username: newUsername };
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    setCurrentUser(updatedUser);
-    setSettingsMessage("用户名更新成功");
+  try {
+    const response = await fetch('/api/profile/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        newUsername: newUsername.trim()
+      })
+    });
+
+    const result = await response.json();
     
-    setTimeout(() => {
-      setSettingsMessage("");
-    }, 3000);
-  };
-
-  const handleUpdatePassword = () => {
-    if (!currentPassword || !newPassword || !confirmPassword) {
-      setSettingsMessage("请填写所有密码字段");
-      return;
+    if (result.success) {
+      // 更新本地存储和状态
+      const updatedUser = { 
+        ...currentUser, 
+        username: result.user.username 
+      };
+      localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      setCurrentUser(updatedUser);
+      setSettingsMessage("用户名更新成功！");
+      
+      // 3秒后清除消息
+      setTimeout(() => {
+        setSettingsMessage("");
+      }, 3000);
+    } else {
+      setSettingsMessage(result.message || "更新用户名失败");
     }
+  } catch (error) {
+    setSettingsMessage("网络错误，请稍后重试");
+  }
+};
+  const handleUpdatePassword = async () => {
+  if (!currentPassword || !newPassword || !confirmPassword) {
+    setSettingsMessage("请填写所有密码字段");
+    return;
+  }
 
-    if (currentPassword !== currentUser.password) {
-      setSettingsMessage("当前密码不正确");
-      return;
+  if (newPassword !== confirmPassword) {
+    setSettingsMessage("两次输入的新密码不一致");
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/profile/update', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: currentUser.id,
+        currentPassword,
+        newPassword
+      })
+    });
+
+    const result = await response.json();
+    if (result.success) {
+      setSettingsMessage("密码更新成功！请重新登录");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+      
+      // 3秒后自动登出
+      setTimeout(() => {
+        handleLogout();
+      }, 3000);
+    } else {
+      setSettingsMessage(result.message || "更新密码失败");
     }
-
-    if (newPassword !== confirmPassword) {
-      setSettingsMessage("两次输入的新密码不一致");
-      return;
-    }
-
-    // 更新密码
-    const updatedUser = { ...currentUser, password: newPassword };
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    setCurrentUser(updatedUser);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setSettingsMessage("密码更新成功");
-    
-    setTimeout(() => {
-      setSettingsMessage("");
-    }, 3000);
-  };
+  } catch (error) {
+    setSettingsMessage("网络错误，请稍后重试");
+  }
+};
 
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
