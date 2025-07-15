@@ -73,30 +73,56 @@ export default function AudiencePage() {
     }
   }}, [router]);
 
-  const handleJoinCourse = () => {
-    if (!courseCode.trim()) {
-      setMessage("请输入课程码");
-      return;
+ const fetchUserCourses = async () => {
+  try {
+    const token = localStorage.getItem('authToken');
+    const response = await fetch('/api/courses/enroll', {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) throw new Error('获取课程失败');
+    
+    const courses = await response.json();
+    setCourses(courses);
+  } catch (error) {
+    setMessage('获取课程列表失败');
+    setTimeout(() => setMessage(''), 3000);
+  }
+};
+
+// 加入课程
+  const handleJoinCourse = async () => {
+  if (!courseCode.trim()) {
+    setMessage("请输入课程码");
+    return;
+  }
+
+  try {
+    const response = await fetch('/api/courses/enroll', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ courseCode: courseCode.trim() })
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || '加入课程失败');
     }
-    
-    // 模拟加入课程
-    const newCourse: Course = {
-      id: Date.now(),
-      title: `课程 ${courseCode}`,
-      organizer: "组织者",
-      courseCode: courseCode
-    };
-    
-    setCourses([...courses, newCourse]);
+
+    // 更新前端状态
+    setCourses(prev => [...prev, data.course]);
     setCourseCode("");
-    setMessage(`成功加入课程: ${newCourse.title}`);
+    setMessage(`成功加入课程: ${data.course.title}`);
     
-    // 3秒后清除消息
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
-  };
-  
+  } catch (error: any) {
+    setMessage(error.message || "加入课程失败");
+  } finally {
+    setTimeout(() => setMessage(""), 3000);
+  }
+};
   const handleLeaveCourse = (id: number) => {
     setCourses(courses.filter(course => course.id !== id));
     setMessage("已退出课程");
