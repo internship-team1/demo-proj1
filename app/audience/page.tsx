@@ -72,6 +72,22 @@ export default function AudiencePage() {
       router.push("/");
     }
   }}, [router]);
+  useEffect(() => {
+  const loadEnrolledCourses = async () => {
+    if (!currentUser?.id) return;
+    
+    try {
+      const res = await fetch(`/api/courses/enroll?userId=${currentUser.id}`);
+      const data = await res.json();
+      if (res.ok) setCourses(data.courses);
+    } catch (error) {
+      console.error("加载课程失败:", error);
+    }
+  };
+
+  loadEnrolledCourses();
+}, [currentUser?.id]); // 依赖用户ID
+
 
  const fetchUserCourses = async () => {
   try {
@@ -93,9 +109,9 @@ export default function AudiencePage() {
 };
 
 // 加入课程
-  const handleJoinCourse = async () => {
-  if (!courseCode.trim()) {
-    setMessage("请输入课程码");
+const handleJoinCourse = async () => {
+  if (!courseCode.trim() || !currentUser?.id) {
+    setMessage("请输入课程码并确保已登录");
     return;
   }
 
@@ -103,22 +119,24 @@ export default function AudiencePage() {
     const response = await fetch('/api/courses/enroll', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ courseCode: courseCode.trim() })
+      body: JSON.stringify({ 
+        courseCode: courseCode.trim(),
+        userId: currentUser.id // 确保使用Prisma中的用户ID
+      })
     });
 
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.error || '加入课程失败');
-    }
+    const result = await response.json();
+    
+    if (!response.ok) throw new Error(result.error || '加入失败');
 
     // 更新前端状态
-    setCourses(prev => [...prev, data.course]);
-    setCourseCode("");
-    setMessage(`成功加入课程: ${data.course.title}`);
-    
+    setCourses(prev => [...prev, result.course]);
+    setMessage(`成功加入: ${result.course.title}`);
+
   } catch (error: any) {
-    setMessage(error.message || "加入课程失败");
+    setMessage(error.message.includes("已经加入") 
+      ? "您已加入该课程"
+      : "加入失败，请重试");
   } finally {
     setTimeout(() => setMessage(""), 3000);
   }

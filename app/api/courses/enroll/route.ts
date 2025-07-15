@@ -3,55 +3,127 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-export async function POST(request: Request) {
+// 类型定义（根据您的Prisma模型）
+type EnrollmentData = {
+  courseCode: string
+  userId: number
+}
+
+export async function GET(request: Request) {
   try {
-    // 1. 获取请求体中的课程码
-    const { courseCode } = await request.json()
-    
-    if (!courseCode) {
+    const { searchParams } = new URL(request.url)
+    const userId = searchParams.get('userId')
+
+    if (!userId) {
       return NextResponse.json(
-        { error: '课程码不能为空' },
+        { error: '需要用户ID参数' },
         { status: 400 }
       )
     }
 
-    // 2. 查询课程是否存在
-    const course = await prisma.course.findUnique({
-      where: { courseCode },
-      select: {
-        id: true,
-        title: true,
-        courseCode: true,
-        organizer: {
-          select: {
-            username: true
+    // 查询用户已加入的课程
+    const enrollments = await prisma.courseMember.findMany({
+      where: { 
+        userId: parseInt(userId) 
+      },
+      include: {
+        course: {
+          include: {
+            organizer: {
+              select: { username: true }
+            }
           }
         }
       }
     })
 
+    return NextResponse.json({
+      courses: enrollments.map(e => ({
+        id: e.course.id,
+        title: e.course.title,
+        courseCode: e.course.courseCode,
+        organizer: e.course.organizer.username,
+        joinedAt: e.joinedAt
+      }))
+    })
+
+  } catch (error) {
+    console.error('[GET_ENROLLMENTS_ERROR]', error)
+    return NextResponse.json(
+      { error: '获取课程失败' },
+      { status: 500 }
+    )
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const { courseCode, userId } = await request.json() as EnrollmentData
+
+    // 验证输入
+    if (!courseCode || !userId) {
+      return NextResponse.json(
+        { error: '缺少课程码或用户ID' },
+        { status: 400 }
+      )
+    }
+
+    // 查找课程
+    const course = await prisma.course.findUnique({
+      where: { courseCode },
+      select: { id: true }
+    })
+
     if (!course) {
       return NextResponse.json(
-        { error: '未找到该课程，请检查课程码是否正确' },
+        { error: '课程不存在' },
         { status: 404 }
       )
     }
 
-    // 3. 返回课程信息（实际项目中这里应该创建关联关系）
-    return NextResponse.json({
-      success: true,
-      course: {
-        id: course.id,
-        title: course.title,
-        courseCode: course.courseCode,
-        organizer: course.organizer.username
+    // 创建关联记录
+    const enrollment = await prisma.courseMember.create({
+      data: {
+        courseId: course.id,
+        userId: userId,
+        joinedAt: new Date()
+      },
+      include: {
+        course: {
+          include: {
+            organizer: {
+              select: { username: true }
+            }
+          }
+        }
       }
     })
 
-  } catch (error) {
-    console.error('加入课程失败:', error)
+    return NextResponse.json({
+      success: true,
+      course: {
+        id: enrollment.course.id,
+        title: enrollment.course.title,
+        courseCode: enrollment.course.courseCode,
+        organizer: enrollment.course.organizer.username
+      }
+    })
+
+  } catch (error: any) {
+    console.error('[ENROLL_ERROR]', error)
+    
+    // 处理重复选课错误
+    if (error.code === 'P2002') {
+      return NextResponse.json(
+        { error: '您已经加入过该课程' },
+        { status: 409 }
+      )
+    }
+
     return NextResponse.json(
-      { error: '服务器错误，请稍后再试' },
+      { error: '选课失败' },
       { status: 500 }
     )
   } finally {
