@@ -141,15 +141,21 @@ const handleJoinCourse = async () => {
     setTimeout(() => setMessage(""), 3000);
   }
 };
-  const handleLeaveCourse = (id: number) => {
-    setCourses(courses.filter(course => course.id !== id));
-    setMessage("已退出课程");
+
+const handleLeaveCourse = async (courseId: number) => {
+  try {
+    const res = await fetch(`/api/courses/enroll?userId=${currentUser?.id}&courseId=${courseId}`, {
+      method: 'DELETE'
+    });
     
-    // 3秒后清除消息
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
-  };
+    if (!res.ok) throw new Error('退出失败');
+    
+    setCourses(prev => prev.filter(c => c.id !== courseId));
+    setMessage("已退出课程");
+  } catch (error) {
+    setMessage("退出失败");
+  }
+};
   
   const viewQuiz = (courseId: number) => {
     router.push(`/audience/quiz/${courseId}`);
@@ -236,7 +242,7 @@ const handleUpdateUsername = async () => {
     setSettingsMessage("网络错误，请稍后重试");
   }
 };
-  const handleUpdatePassword = async () => {
+const handleUpdatePassword = async () => {
   if (!currentPassword || !newPassword || !confirmPassword) {
     setSettingsMessage("请填写所有密码字段");
     return;
@@ -276,15 +282,12 @@ const handleUpdateUsername = async () => {
     setSettingsMessage("网络错误，请稍后重试");
   }
 };
+
   const handleLogout = () => {
     localStorage.removeItem('currentUser');
     router.push("/");
   };
-
-  if (!currentUser) {
-    return <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800">加载中...</div>;
-  }
-
+  
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800">
       {/* 左侧导航栏 */}

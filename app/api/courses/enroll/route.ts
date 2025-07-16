@@ -3,7 +3,7 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-// 类型定义（根据您的Prisma模型）
+// 类型定义
 type EnrollmentData = {
   courseCode: string
   userId: number
@@ -128,5 +128,37 @@ export async function POST(request: Request) {
     )
   } finally {
     await prisma.$disconnect()
+  }
+}
+
+//删除功能
+export async function DELETE(request: Request) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get('userId');
+    const courseId = searchParams.get('courseId');
+
+    if (!userId || !courseId) {
+      return NextResponse.json(
+        { error: '需要用户ID和课程ID' },
+        { status: 400 }
+      );
+    }
+
+    await prisma.courseMember.deleteMany({
+      where: {
+        userId: parseInt(userId),
+        courseId: parseInt(courseId)
+      }
+    });
+
+    return NextResponse.json({ success: true });
+
+  } catch (error) {
+    console.error('[LEAVE_COURSE_ERROR]', error);
+    return NextResponse.json(
+      { error: '退出课程失败' },
+      { status: 500 }
+    );
   }
 }
