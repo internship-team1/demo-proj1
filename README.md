@@ -75,12 +75,15 @@ npx prisma migrate dev
 ```bash
 npx prisma generate
 ```
-- 每次开发完成后也要迁移数据，之后才能提交和推送
+- 每次开发完成后也要迁移数据，拉取之后才能提交和推送
 ```bash
 npx prisma migrate dev
 ```
 ```bash
 npx prisma generate
+```
+```bash
+git pull
 ```
 - 完成一个功能可以正常运行后才能推送到仓库，否则其他队员在开发时无法确定是自己的代码有问题还是别人的有问题
 - 命令ai辅助编程时使用步骤化精细化的命令，不要只是笼统的概括
