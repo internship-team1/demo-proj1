@@ -24,15 +24,13 @@ export async function GET(req: NextRequest) {
     include: { user: true },
   });
 
-  // 只返回听众（role: "audience"）信息，并标记 isSpeaker
-  const students = members
-    .filter(m => m.user.role === "audience")
-    .map(m => ({
-      id: m.user.id,
-      username: m.user.username,
-      role: m.user.role,
-      isSpeaker: course?.speakerId === m.user.id
-    }));
+  // 返回所有成员，并标记 isSpeaker
+  const students = members.map(m => ({
+    id: m.user.id,
+    username: m.user.username,
+    role: m.user.role,
+    isSpeaker: course?.speakerId === m.user.id
+  }));
 
   return NextResponse.json(students);
 }
