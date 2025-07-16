@@ -250,31 +250,46 @@ export default function OrganizerPage() {
     }, 2000);
   };
 
-  const handleUpdateUsername = () => {
+  const handleUpdateUsername = async () => {
     if (!newUsername.trim()) {
       setSettingsMessage("用户名不能为空");
       return;
     }
 
-    // 更新用户名
-    const updatedUser = { ...currentUser, username: newUsername };
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    setCurrentUser(updatedUser);
-    setSettingsMessage("用户名更新成功");
+    try {
+      const response = await fetch("/api/profile/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          userId: currentUser.id, 
+          newUsername 
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // 更新本地存储和状态
+        const updatedUser = { ...currentUser, username: newUsername };
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
+        setSettingsMessage("用户名更新成功");
+      } else {
+        setSettingsMessage(data.message || "更新失败");
+      }
+    } catch (error) {
+      console.error("更新用户名错误:", error);
+      setSettingsMessage("服务器错误，请稍后再试");
+    }
     
     setTimeout(() => {
       setSettingsMessage("");
     }, 3000);
   };
 
-  const handleUpdatePassword = () => {
+  const handleUpdatePassword = async () => {
     if (!currentPassword || !newPassword || !confirmPassword) {
       setSettingsMessage("请填写所有密码字段");
-      return;
-    }
-
-    if (currentPassword !== currentUser.password) {
-      setSettingsMessage("当前密码不正确");
       return;
     }
 
@@ -283,14 +298,35 @@ export default function OrganizerPage() {
       return;
     }
 
-    // 更新密码
-    const updatedUser = { ...currentUser, password: newPassword };
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    setCurrentUser(updatedUser);
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-    setSettingsMessage("密码更新成功");
+    try {
+      const response = await fetch("/api/profile/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          userId: currentUser.id,
+          currentPassword,
+          newPassword 
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (data.success) {
+        // 更新本地存储和状态
+        const updatedUser = { ...currentUser, password: newPassword };
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+        setCurrentUser(updatedUser);
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setSettingsMessage("密码更新成功");
+      } else {
+        setSettingsMessage(data.message || "更新失败");
+      }
+    } catch (error) {
+      console.error("更新密码错误:", error);
+      setSettingsMessage("服务器错误，请稍后再试");
+    }
     
     setTimeout(() => {
       setSettingsMessage("");
