@@ -158,11 +158,28 @@ export default function SpeakerPage() {
       }
       setCurrentUser(user);
       setNewUsername(user.username);
+      
+      // 加载当前用户担任演讲者的课程
+      fetchMySpeakerCourses(user.id);
     } catch (error) {
       localStorage.removeItem('currentUser');
       router.push("/");
     }
   }, [router]);
+  
+  const fetchMySpeakerCourses = async (userId: number) => {
+    try {
+      // 获取当前用户担任演讲者的课程
+      const response = await fetch(`/api/course?speakerId=${userId}`);
+      if (response.ok) {
+        const coursesData = await response.json();
+        setCourses(coursesData);
+      }
+    } catch (error) {
+      console.error("获取课程失败:", error);
+      setMessage("获取课程列表失败");
+    }
+  };
 
   const handleDeleteCourse = (id: number) => {
     setCourses(courses.filter(course => course.id !== id));
@@ -175,6 +192,43 @@ export default function SpeakerPage() {
   
   const handleViewQuiz = (courseId: number) => {
     router.push(`/speaker/quiz/${courseId}`);
+  };
+
+  const handleExitCourse = async (courseId: number) => {
+    if (!currentUser?.id) return;
+    
+    if (!confirm("确定要退出该课程的演讲者角色吗？")) {
+      return;
+    }
+    
+    try {
+      const response = await fetch('/api/courses/speaker/exit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          courseId,
+          speakerId: currentUser.id
+        })
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        // 更新本地课程列表，移除已退出的课程
+        setCourses(courses.filter(course => course.id !== courseId));
+        setMessage("已成功退出课程");
+      } else {
+        setMessage(result.error || "退出课程失败");
+      }
+      
+      // 3秒后清除消息
+      setTimeout(() => {
+        setMessage("");
+      }, 3000);
+    } catch (error) {
+      console.error("退出课程时发生错误:", error);
+      setMessage("网络错误，请稍后重试");
+    }
   };
 
   const handleUpdateUsername = async () => {
@@ -356,10 +410,19 @@ export default function SpeakerPage() {
         {/* 课程页面 */}
         {activeTab === "courses" && (
           <div>
-            <h2 className="text-2xl font-bold mb-6 text-gray-800">我的课程</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-800">我的课程</h1>
+            </div>
             
-            {/* 课程列表 */}
-            {courses.length > 0 ? (
+            {message && (
+              <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-md">
+                {message}
+              </div>
+            )}
+            
+            {courses.length === 0 ? (
+              <p className="text-gray-500">您还没有任何课程</p>
+            ) : (
               <div className="grid gap-6 md:grid-cols-2">
                 {courses.map(course => (
                   <div key={course.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
@@ -370,19 +433,15 @@ export default function SpeakerPage() {
                       <span className="bg-gray-100 px-3 py-1 rounded-md font-mono">{course.courseCode}</span>
                     </div>
                     <div className="grid grid-cols-1 gap-3">
-                                              <button 
-                          className="w-full py-2 px-3 bg-transparent hover:bg-gray-100 text-red-600 rounded-md transition-colors border border-gray-300"
-                          onClick={() => handleDeleteCourse(course.id)}
-                        >
-                          退出
-                        </button>
+                      <button 
+                        className="w-full py-2 px-3 bg-transparent hover:bg-gray-100 text-red-600 rounded-md transition-colors border border-gray-300"
+                        onClick={() => handleExitCourse(course.id)}
+                      >
+                        退出课程
+                      </button>
                     </div>
                   </div>
                 ))}
-              </div>
-            ) : (
-              <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-gray-600">您还没有任何课程</p>
               </div>
             )}
           </div>

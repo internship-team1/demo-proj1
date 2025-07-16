@@ -26,6 +26,8 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
+  const speakerId = searchParams.get("speakerId");
+  
   if (id) {
     // 查询单个课程
     const course = await prisma.course.findUnique({ where: { id: Number(id) } });
@@ -35,6 +37,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
   }
+  
+  if (speakerId) {
+    // 查询指定演讲者的所有课程
+    const speakerCourses = await prisma.course.findMany({
+      where: { speakerId: Number(speakerId) },
+      include: {
+        organizer: {
+          select: {
+            username: true
+          }
+        }
+      }
+    });
+    
+    // 格式化返回数据，添加organizer字段
+    const formattedCourses = speakerCourses.map(course => ({
+      id: course.id,
+      title: course.title,
+      courseCode: course.courseCode,
+      organizer: course.organizer.username,
+      description: course.description
+    }));
+    
+    return NextResponse.json(formattedCourses);
+  }
+  
   // 查询所有课程
   const allCourses = await prisma.course.findMany();
   return NextResponse.json(allCourses);
