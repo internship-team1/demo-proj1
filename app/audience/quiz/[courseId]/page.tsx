@@ -54,6 +54,7 @@ export default function CourseQuizPage() {
   const [showComments, setShowComments] = useState(false);
   const [canComment, setCanComment] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [courseInfo, setCourseInfo] = useState<{title: string, courseCode: string} | null>(null);
 
   useEffect(() => {
     // 检查用户登录状态
@@ -73,6 +74,7 @@ export default function CourseQuizPage() {
       
       // 加载课程的测验列表
       if (courseId) {
+        fetchCourseInfo(courseId.toString());
         fetchQuizzes(courseId.toString());
       }
     } catch (error) {
@@ -80,6 +82,22 @@ export default function CourseQuizPage() {
       router.push("/");
     }
   }, [courseId, router]);
+
+  // 获取课程信息
+  const fetchCourseInfo = async (courseId: string) => {
+    try {
+      const response = await fetch(`/api/course?id=${courseId}`);
+      if (!response.ok) throw new Error("获取课程信息失败");
+      
+      const data = await response.json();
+      setCourseInfo({
+        title: data.title,
+        courseCode: data.courseCode
+      });
+    } catch (error) {
+      console.error("获取课程信息失败:", error);
+    }
+  };
 
   // 获取课程的测验列表
   const fetchQuizzes = async (courseId: string) => {
@@ -686,7 +704,7 @@ export default function CourseQuizPage() {
         </div>
         
         <h1 className="text-3xl font-bold mb-2 text-gray-800">课程问卷</h1>
-        <p className="text-gray-500 mb-8">课程ID: {courseId}</p>
+        <p className="text-gray-500 mb-8">课程码: {courseInfo?.courseCode || "加载中..."}</p>
         
         {quizzes.length > 0 ? (
           <div className="space-y-6">
@@ -710,49 +728,49 @@ export default function CourseQuizPage() {
                 const isCompleted = quiz.isActive && endTime && now > endTime;
                 
                 return (
-                <div key={quiz.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-                  <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
-                  <div className="flex justify-between items-start mb-4">
-                    <div>
-                      <h3 className="text-xl font-medium text-gray-800">{quiz.title}</h3>
-                      {quiz.description && (
-                        <p className="text-gray-600 mt-1">{quiz.description}</p>
-                      )}
-                    </div>
+              <div key={quiz.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-medium text-gray-800">{quiz.title}</h3>
+                    {quiz.description && (
+                      <p className="text-gray-600 mt-1">{quiz.description}</p>
+                    )}
+                  </div>
                       <span className={`px-2 py-1 text-xs rounded ${
                         isActive ? "bg-green-100 text-green-800 border border-green-200" : 
                         "bg-blue-100 text-blue-800 border border-blue-200"
                       }`}>
                         {isActive ? "进行中" : "已结束"}
-                    </span>
+                  </span>
+                </div>
+                
+                {quiz.startTime && quiz.endTime && (
+                  <div className="flex space-x-4 text-sm text-gray-500 mb-4">
+                    <span>开始: {new Date(quiz.startTime).toLocaleString()}</span>
+                    <span>结束: {new Date(quiz.endTime).toLocaleString()}</span>
                   </div>
-                  
-                  {quiz.startTime && quiz.endTime && (
-                    <div className="flex space-x-4 text-sm text-gray-500 mb-4">
-                      <span>开始: {new Date(quiz.startTime).toLocaleString()}</span>
-                      <span>结束: {new Date(quiz.endTime).toLocaleString()}</span>
-                    </div>
-                  )}
-                  
-                  <div className="flex space-x-4">
+                )}
+                
+                <div className="flex space-x-4">
                       {isActive && (
-                    <button 
-                      className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300"
+                  <button 
+                    className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300"
                           onClick={() => handleStartQuiz(quiz)}
-                    >
-                      开始答题
-                    </button>
+                  >
+                    开始答题
+                  </button>
                       )}
                       {isCompleted && (
-                    <button 
-                      className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-600 rounded-md transition-colors border border-gray-300"
+                  <button 
+                    className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-600 rounded-md transition-colors border border-gray-300"
                           onClick={() => handleViewResults(quiz)}
-                    >
-                      查看结果
-                    </button>
+                  >
+                    查看结果
+                  </button>
                       )}
-                    </div>
-                  </div>
+                </div>
+              </div>
                 );
               })}
           </div>

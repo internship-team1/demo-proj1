@@ -54,18 +54,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // 删除用户之前的答案（如果有）
-    await prisma.answer.deleteMany({
+    // 提交新答案
+    const createdAnswers = [];
+    let correctCount = 0;
+
+    // 先获取用户已有的答案
+    const existingAnswers = await prisma.answer.findMany({
       where: {
         userId,
         quizId
       }
     });
 
-    // 提交新答案
-    const createdAnswers = [];
-    let correctCount = 0;
-    
+    // 创建一个映射，快速查找用户是否已回答某问题
+    const answeredQuestions = new Set(existingAnswers.map(a => a.questionId));
+
     for (const answer of answers) {
       const { questionId, optionId } = answer;
       
@@ -77,21 +80,59 @@ export async function POST(request: Request) {
       const option = question.options.find(o => o.id === optionId);
       if (!option) continue;
       
-      // 创建答案记录
-      const createdAnswer = await prisma.answer.create({
-        data: {
-          quizId,
-          questionId,
-          optionId,
-          userId
+      // 如果用户已经回答过这个问题，跳过
+      if (answeredQuestions.has(questionId)) {
+        // 找到已存在的答案
+        const existingAnswer = existingAnswers.find(a => a.questionId === questionId);
+        if (existingAnswer) {
+          createdAnswers.push(existingAnswer);
+          
+          // 检查已有答案是否正确
+          const existingOption = question.options.find(o => o.id === existingAnswer.optionId);
+          if (existingOption?.isCorrect) {
+            correctCount++;
+          }
         }
-      });
+        continue;
+      }
       
-      createdAnswers.push(createdAnswer);
-      
-      // 检查是否正确
-      if (option.isCorrect) {
-        correctCount++;
+      // 创建新答案记录
+      try {
+        const createdAnswer = await prisma.answer.create({
+          data: {
+            quizId,
+            questionId,
+            optionId,
+            userId
+          }
+        });
+        
+        createdAnswers.push(createdAnswer);
+        
+        // 检查是否正确
+        if (option.isCorrect) {
+          correctCount++;
+        }
+      } catch (error) {
+        console.error(`创建答案失败 (问题ID: ${questionId}):`, error);
+        // 如果创建失败，尝试查找可能已存在的答案
+        const existingAnswer = await prisma.answer.findFirst({
+          where: {
+            userId,
+            quizId,
+            questionId
+          }
+        });
+        
+        if (existingAnswer) {
+          createdAnswers.push(existingAnswer);
+          
+          // 检查已有答案是否正确
+          const existingOption = question.options.find(o => o.id === existingAnswer.optionId);
+          if (existingOption?.isCorrect) {
+            correctCount++;
+          }
+        }
       }
     }
 
