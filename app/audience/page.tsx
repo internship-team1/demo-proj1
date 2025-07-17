@@ -23,20 +23,13 @@ export default function AudiencePage() {
   const [activeTab, setActiveTab] = useState("courses");
   const [courseCode, setCourseCode] = useState("");
   const [message, setMessage] = useState("");
-  const [courses, setCourses] = useState<Course[]>([
-    { id: 1, title: "Web开发基础", organizer: "组织者1", courseCode: "WEB001" },
-    { id: 2, title: "数据结构与算法", organizer: "组织者2", courseCode: "DSA002" },
-  ]);
+  const [courses, setCourses] = useState<Course[]>([]);
   
   // 留言相关状态
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
-  const [comments, setComments] = useState<Comment[]>([
-    { id: 1, userId: "user1", username: "张三", courseId: 1, text: "这节课讲得非常好！", timestamp: "2023-10-01 14:30" },
-    { id: 2, userId: "user2", username: "李四", courseId: 1, text: "请问什么时候会有下一节课？", timestamp: "2023-10-01 15:45" },
-    { id: 3, userId: "user1", username: "张三", courseId: 2, text: "这个算法有点难理解", timestamp: "2023-10-02 09:20" },
-  ]);
+  const [comments, setComments] = useState<Comment[]>([]);
   
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);

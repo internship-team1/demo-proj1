@@ -33,106 +33,23 @@ export default function SpeakerPage() {
   const [currentUser, setCurrentUser] = useState<any>(null);
   
   // Course state
-  const [courses, setCourses] = useState<Course[]>([
-    { id: 1, title: "Web开发基础", organizer: "组织者1", courseCode: "WEB001" },
-    { id: 2, title: "数据结构与算法", organizer: "组织者2", courseCode: "DSA002" },
-  ]);
+  const [courses, setCourses] = useState<Course[]>([]);
   const [message, setMessage] = useState("");
   
   // Statistics state
   const [selectedCourse, setSelectedCourse] = useState<number | null>(null);
   
   // 问卷相关数据
-  const [quizList, setQuizList] = useState<{id: number, courseId: number, title: string}[]>([
-    { id: 1, courseId: 1, title: "Web开发基础 - 第一周反馈" },
-    { id: 2, courseId: 1, title: "Web开发基础 - 第二周反馈" },
-    { id: 3, courseId: 2, title: "数据结构与算法 - 期中反馈" }
-  ]);
+  const [quizList, setQuizList] = useState<{id: number, courseId: number, title: string}[]>([]);
   
   const [selectedQuiz, setSelectedQuiz] = useState<number | null>(null);
   
-  const [surveyResults, setSurveyResults] = useState<SurveyResult[]>([
-    {
-      id: 1,
-      courseId: 1,
-      quizId: 1,
-      questionText: "您对本课程的整体满意度如何？",
-      options: [
-        { text: "非常满意", count: 15 },
-        { text: "满意", count: 23 },
-        { text: "一般", count: 8 },
-        { text: "不满意", count: 3 },
-      ],
-      totalResponses: 49
-    },
-    {
-      id: 2,
-      courseId: 1,
-      quizId: 1,
-      questionText: "课程内容难度适中吗？",
-      options: [
-        { text: "太简单", count: 5 },
-        { text: "适中", count: 35 },
-        { text: "有点难", count: 7 },
-        { text: "太难", count: 2 },
-      ],
-      totalResponses: 49
-    },
-    {
-      id: 3,
-      courseId: 1,
-      quizId: 2,
-      questionText: "您认为课程进度如何？",
-      options: [
-        { text: "太快", count: 10 },
-        { text: "适中", count: 25 },
-        { text: "太慢", count: 5 },
-      ],
-      totalResponses: 40
-    },
-    {
-      id: 4,
-      courseId: 1,
-      quizId: 2,
-      questionText: "案例演示是否清晰？",
-      options: [
-        { text: "非常清晰", count: 18 },
-        { text: "比较清晰", count: 15 },
-        { text: "一般", count: 5 },
-        { text: "不太清晰", count: 2 },
-      ],
-      totalResponses: 40
-    },
-    {
-      id: 5,
-      courseId: 1,
-      quizId: 2,
-      questionText: "是否需要更多的实践环节？",
-      options: [
-        { text: "非常需要", count: 22 },
-        { text: "比较需要", count: 12 },
-        { text: "目前刚好", count: 6 },
-      ],
-      totalResponses: 40
-    },
-  ]);
+  const [surveyResults, setSurveyResults] = useState<SurveyResult[]>([]);
   
-  const [messages, setMessages] = useState<Message[]>([
-    { id: 1, courseId: 1, userName: "学生A", content: "课程非常有用，谢谢老师！", timestamp: "2023-05-15 14:30" },
-    { id: 2, courseId: 1, userName: "学生B", content: "能否多讲一些实际应用案例？", timestamp: "2023-05-15 15:45" },
-    { id: 3, courseId: 2, userName: "学生C", content: "算法部分有点难理解，可以再详细解释一下吗？", timestamp: "2023-05-16 10:15" },
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
   
   // 问卷讨论区数据
-  const [surveyDiscussions, setSurveyDiscussions] = useState<{[key: number]: Message[]}>({
-    1: [
-      { id: 101, courseId: 1, userName: "学生D", content: "整体满意度问题很好，但是可以增加更细化的评分", timestamp: "2023-05-17 10:25" },
-      { id: 102, courseId: 1, userName: "学生E", content: "希望在这个问题中增加一个\"非常不满意\"的选项", timestamp: "2023-05-17 11:30" },
-    ],
-    2: [
-      { id: 201, courseId: 1, userName: "学生F", content: "难度这个问题可以具体到每个章节", timestamp: "2023-05-18 09:15" },
-    ]
-  });
+  const [surveyDiscussions, setSurveyDiscussions] = useState<{[key: number]: Message[]}>({});
   
   // Settings state
   const [newUsername, setNewUsername] = useState("");
