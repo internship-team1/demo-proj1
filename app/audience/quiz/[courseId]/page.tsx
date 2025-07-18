@@ -55,6 +55,7 @@ export default function CourseQuizPage() {
   const [canComment, setCanComment] = useState(false);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [courseInfo, setCourseInfo] = useState<{title: string, courseCode: string} | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // 检查用户登录状态
@@ -213,13 +214,22 @@ export default function CourseQuizPage() {
       ...prev,
       [questionId]: optionId
     }));
+    setErrorMessage(null); // 清除错误消息
   };
 
   // 下一题
   const goToNextQuestion = () => {
     if (!activeQuiz || !activeQuiz.questions) return;
     
+    // 检查用户是否已回答当前问题
+    const currentQuestionId = activeQuiz.questions[currentQuestionIndex].id;
+    if (selectedAnswers[currentQuestionId] === undefined) {
+      setErrorMessage("请先回答当前问题。");
+      return;
+    }
+    
     if (currentQuestionIndex < activeQuiz.questions.length - 1) {
+      setErrorMessage(null); // 清除错误消息
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
       setShowResults(true);
@@ -236,6 +246,16 @@ export default function CourseQuizPage() {
   // 提交测验
   const handleSubmitQuiz = async () => {
     if (!activeQuiz || !activeQuiz.questions || !currentUser) return;
+    
+    // 检查所有问题是否都已回答
+    const unansweredQuestions = activeQuiz.questions.filter(question => 
+      selectedAnswers[question.id] === undefined
+    );
+    
+    if (unansweredQuestions.length > 0) {
+      setErrorMessage(`还有 ${unansweredQuestions.length} 道题未回答，请先回答所有题目。`);
+      return;
+    }
     
     try {
       // 准备答案数据
@@ -642,6 +662,13 @@ export default function CourseQuizPage() {
                       </div>
                     ))}
                   </div>
+                  
+                  {/* 错误消息显示 */}
+                  {errorMessage && (
+                    <div className="mt-4 p-2 bg-red-50 border border-red-100 rounded-md text-red-600 text-sm">
+                      {errorMessage}
+                    </div>
+                  )}
                   
                   {/* 导航区域 */}
                   <div className="mt-8 flex justify-between items-center">

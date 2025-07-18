@@ -73,6 +73,7 @@ export default function OrganizerPage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [settingsMessage, setSettingsMessage] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // 检查本地存储中是否有用户信息
@@ -317,13 +318,27 @@ export default function OrganizerPage() {
       ...selectedAnswers,
       [currentQuestionIndex]: answer
     });
+    setErrorMessage(null); // 清除错误消息
   };
   
   const goToNextQuestion = () => {
     if (generatedQuestions && generatedQuestions.questions && 
         currentQuestionIndex < generatedQuestions.questions.length - 1) {
+      // 检查当前问题是否已回答
+      if (selectedAnswers[currentQuestionIndex] === undefined) {
+        setErrorMessage("请先回答当前问题");
+        return;
+      }
+      setErrorMessage(null); // 清除错误消息
       setCurrentQuestionIndex(currentQuestionIndex + 1);
     } else {
+      // 检查最后一题是否已回答
+      if (generatedQuestions && generatedQuestions.questions && 
+          selectedAnswers[currentQuestionIndex] === undefined) {
+        setErrorMessage("请先回答当前问题");
+        return;
+      }
+      setErrorMessage(null); // 清除错误消息
       setShowResults(true);
     }
   };
@@ -823,6 +838,13 @@ export default function OrganizerPage() {
                                   ));
                                 })()}
                               </div>
+                              
+                              {/* 错误消息显示 */}
+                              {errorMessage && (
+                                <div className="mt-4 p-2 bg-red-50 border border-red-100 rounded-md text-red-600 text-sm">
+                                  {errorMessage}
+                                </div>
+                              )}
                               
                               {/* 导航区域 */}
                               <div className="mt-8 flex justify-between items-center">
