@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 
+
 interface Course {
   id: number;
   title: string;
@@ -23,13 +24,20 @@ export default function AudiencePage() {
   const [activeTab, setActiveTab] = useState("courses");
   const [courseCode, setCourseCode] = useState("");
   const [message, setMessage] = useState("");
-  const [courses, setCourses] = useState<Course[]>([]);
+  const [courses, setCourses] = useState<Course[]>([
+    { id: 1, title: "Web开发基础", organizer: "组织者1", courseCode: "WEB001" },
+    { id: 2, title: "数据结构与算法", organizer: "组织者2", courseCode: "DSA002" },
+  ]);
   
   // 留言相关状态
   const [showCommentModal, setShowCommentModal] = useState(false);
   const [selectedCourseId, setSelectedCourseId] = useState<number | null>(null);
   const [commentText, setCommentText] = useState("");
-  const [comments, setComments] = useState<Comment[]>([]);
+  const [comments, setComments] = useState<Comment[]>([
+    { id: 1, userId: "user1", username: "张三", courseId: 1, text: "这节课讲得非常好！", timestamp: "2023-10-01 14:30" },
+    { id: 2, userId: "user2", username: "李四", courseId: 1, text: "请问什么时候会有下一节课？", timestamp: "2023-10-01 15:45" },
+    { id: 3, userId: "user1", username: "张三", courseId: 2, text: "这个算法有点难理解", timestamp: "2023-10-02 09:20" },
+  ]);
   
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -148,43 +156,60 @@ const handleLeaveCourse = async (courseId: number) => {
   } catch (error) {
     setMessage("退出失败");
   }
+  
 };
   
   const viewQuiz = (courseId: number) => {
     router.push(`/audience/quiz/${courseId}`);
   };
 
-  // 处理留言功能
-  const handleComment = (courseId: number) => {
-    setSelectedCourseId(courseId);
+ const handleComment = async (courseId: number) => {
+  setSelectedCourseId(courseId);
+  try {
+    const res = await fetch(`/api/comments?courseId=${courseId}`);
+    const apiComments = await res.json();
+    
+    // 转换API数据为前端兼容格式
+    const adaptedComments = apiComments.map((apiComment: any) => ({
+      id: apiComment.id,
+      userId: String(apiComment.userId), // 确保是string类型
+      username: apiComment.user?.username || '未知用户',
+      courseId: apiComment.courseId,
+      text: apiComment.content, // 关键：将content映射到text
+      timestamp: apiComment.createdAt
+    }));
+    
+    setComments(adaptedComments);
     setShowCommentModal(true);
-  };
+  } catch (error) {
+    console.error("加载留言失败:", error);
+  }
+};
 
-  // 提交留言
-  const submitComment = () => {
-    if (!commentText.trim()) {
-      return;
+const submitComment = async () => {
+  if (!commentText.trim() || !selectedCourseId || !currentUser?.id) return;
+
+  try {
+    const response = await fetch('/api/comments', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        content: commentText, // API需要content字段
+        courseId: selectedCourseId,
+        userId: Number(currentUser.id) // 确保是number类型
+      })
+    });
+
+    if (response.ok) {
+      setCommentText("");
+      // 重新加载最新留言
+      await handleComment(selectedCourseId); // 复用上面的加载逻辑
+      setMessage("留言已发送");
     }
-    
-    // 添加新留言
-    const newComment: Comment = {
-      id: Date.now(),
-      userId: currentUser.id || currentUser.username,
-      username: currentUser.username,
-      courseId: selectedCourseId as number,
-      text: commentText,
-      timestamp: new Date().toLocaleString()
-    };
-    
-    setComments([...comments, newComment]);
-    
-    // 重置状态
-    setCommentText("");
-    setMessage("留言已发送");
-    setTimeout(() => {
-      setMessage("");
-    }, 3000);
-  };
+  } catch (error) {
+    setMessage("留言发送失败");
+  }
+};
 
   // 获取当前课程的评论
   const getCurrentCourseComments = () => {
@@ -483,33 +508,33 @@ const handleUpdatePassword = async () => {
             {/* 留言列表 */}
             <div className="max-h-96 overflow-y-auto mb-4 border border-gray-200 rounded-lg p-4">
               {getCurrentCourseComments().length > 0 ? (
-                <div className="space-y-4">
-                  {getCurrentCourseComments().map(comment => (
-                    <div 
-                      key={comment.id} 
-                      className={`flex ${isCurrentUserComment(comment) ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div 
-                        className={`max-w-[80%] p-3 rounded-lg ${
-                          isCurrentUserComment(comment) 
-                            ? 'bg-gray-800 text-white ml-auto' 
-                            : 'bg-gray-100 text-gray-800 mr-auto'
-                        }`}
-                      >
-                        <div className="flex justify-between items-center mb-1 text-xs">
-                          <span className="font-medium">{isCurrentUserComment(comment) ? '我' : comment.username}</span>
-                          <span className="opacity-70">{comment.timestamp}</span>
-                        </div>
-                        <p>{comment.text}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-gray-500">
-                  暂无留言
-                </div>
-              )}
+  <div className="space-y-4">
+    {getCurrentCourseComments().map(comment => (
+  <div 
+    key={comment.id} 
+    className={`flex ${isCurrentUserComment(comment) ? 'justify-end' : 'justify-start'}`}
+  >
+    <div className={`max-w-[80%] p-3 rounded-lg ${
+      isCurrentUserComment(comment) 
+        ? 'bg-gray-800 text-white ml-auto' 
+        : 'bg-gray-100 text-gray-800 mr-auto'
+    }`}>
+      <div className="flex justify-between items-center mb-1 text-xs">
+        <span className="font-medium">
+          {isCurrentUserComment(comment) ? '我' : comment.username}
+        </span>
+        <span className="opacity-70">
+          {new Date(comment.timestamp).toLocaleString()}
+        </span>
+      </div>
+      <p>{comment.text}</p> {/* 直接使用text字段 */}
+    </div>
+  </div>
+))}
+  </div>
+) : (
+  <div className="text-center py-8 text-gray-500">暂无留言</div>
+)}
             </div>
             
             {/* 发送留言 */}
