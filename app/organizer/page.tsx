@@ -29,6 +29,18 @@ interface Message {
   timestamp: string;
 }
 
+// 定义 QuizStatistics 类型
+interface QuizStatistics {
+  quizId: number;
+  quizTitle: string;
+  questions: {
+    questionId: number;
+    questionText: string;
+    total: number;
+    correct: number;
+  }[];
+}
+
 export default function OrganizerPage() {
   const [activeTab, setActiveTab] = useState("courses");
   const router = useRouter();
@@ -74,6 +86,8 @@ export default function OrganizerPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [settingsMessage, setSettingsMessage] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const [quizStatistics, setQuizStatistics] = useState<QuizStatistics[]>([]);
 
   useEffect(() => {
     // 检查本地存储中是否有用户信息
@@ -520,6 +534,21 @@ export default function OrganizerPage() {
       setIsSendingQuiz(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab === "statistics" && selectedCourse) {
+      // 拉取统计数据
+      fetch(`/api/quiz/statistics?courseId=${selectedCourse}`)
+        .then(res => res.json())
+        .then(setQuizStatistics);
+      // 拉取该课程的所有问卷
+      fetch(`/api/quiz/list?courseId=${selectedCourse}`)
+        .then(res => res.json())
+        .then(data => {
+          setQuizList(Array.isArray(data) ? data : []);
+        });
+    }
+  }, [activeTab, selectedCourse]);
 
   if (!currentUser) {
     return <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800">加载中...</div>;
@@ -973,65 +1002,20 @@ export default function OrganizerPage() {
                         <h3 className="text-xl font-medium text-gray-800">问卷统计</h3>
                       </div>
                       
-                      {surveyResults.filter(result => result.quizId === selectedQuiz).length > 0 ? (
-                        <div className="space-y-8">
-                          {surveyResults.filter(result => result.quizId === selectedQuiz).map(result => (
-                            <div key={result.id} className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
-                              {/* 问卷结果展示 */}
-                              <div className="p-6 border-b border-gray-200">
-                                <h4 className="text-lg font-medium mb-4">{result.questionText}</h4>
-                                <div className="space-y-4">
-                                  {result.options.map((option, index) => (
-                                    <div key={index} className="relative">
-                                      <div className="flex items-center mb-1">
-                                        <span className="text-sm text-gray-600 w-20">{option.text}</span>
-                                        <div className="flex-1 ml-2">
-                                          <div 
-                                            className="h-6 bg-gray-200 rounded-md relative overflow-hidden"
-                                            style={{ width: "100%" }}
-                                          >
-                                            <div 
-                                              className="h-full bg-gradient-to-r from-gray-500 to-gray-400 absolute top-0 left-0"
-                                              style={{ width: `${(option.count / Math.max(...result.options.map(o => o.count))) * 100}%` }}
-                                            ></div>
-                                          </div>
-                                        </div>
-                                        <span className="ml-2 text-sm w-10 text-right">{option.count}</span>
-                                      </div>
-                                    </div>
-                                  ))}
+                      {quizStatistics
+                        .filter(q => q.quizId === selectedQuiz)
+                        .map(quiz => (
+                          <div key={quiz.quizId}>
+                            {quiz.questions.map(q => (
+                              <div key={q.questionId} className="mb-4 p-4 bg-gray-50 rounded border">
+                                <div className="font-medium mb-2">{q.questionText}</div>
+                                <div className="text-sm text-gray-700">
+                                  答题人数：{q.total}，答对人数：{q.correct}
                                 </div>
-                                <p className="mt-4 text-sm text-gray-500">总回答数: {result.totalResponses}</p>
                               </div>
-                              
-                              {/* 问卷讨论区 */}
-                              <div className="p-6 bg-gray-50">
-                                <h4 className="text-md font-medium mb-3">问题讨论</h4>
-                                
-                                {surveyDiscussions[result.id] && surveyDiscussions[result.id].length > 0 ? (
-                                  <div className="space-y-3">
-                                    {surveyDiscussions[result.id].map(message => (
-                                      <div key={message.id} className="p-3 bg-white rounded-md border border-gray-200">
-                                        <div className="flex justify-between items-center mb-1">
-                                          <span className="font-medium text-sm">{message.userName}</span>
-                                          <span className="text-xs text-gray-500">{message.timestamp}</span>
-                                        </div>
-                                        <p className="text-sm text-gray-700">{message.content}</p>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-sm text-gray-500">暂无讨论</p>
-                                )}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
-                          <p className="text-gray-600">此问卷尚无统计结果</p>
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        ))}
                     </div>
                   ) : (
                     <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
