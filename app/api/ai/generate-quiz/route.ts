@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 // OpenAI兼容格式调用
 async function callOpenAIFormat(content: string) {
   const prompt = `
-  请根据以下内容，生成5个单选题，每个问题有4个选项(A,B,C,D)，并标明正确答案。
+  你是一位教育专家，精通生成测验题检查学生对内容的掌握情况，现在请你阅读并理解我上传的文件，使用中文生成5个单选题，每个问题有4个选项(A,B,C,D)，并标明正确答案。
   
   内容:
   ${content}
