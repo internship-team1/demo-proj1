@@ -186,74 +186,48 @@ export default function OrganizerPage() {
     if (event.target.files && event.target.files.length > 0) {
       const file = event.target.files[0];
       
-      // 检查文件大小，限制在10MB以内
-      const maxSizeInBytes = 10 * 1024 * 1024; // 10MB
+      // 增加文件大小限制至50MB
+      const maxSizeInBytes = 50 * 1024 * 1024; // 50MB
       if (file.size > maxSizeInBytes) {
-        setMessage(`文件过大，请选择小于10MB的文件`);
+        setMessage(`文件过大，请选择小于50MB的文件`);
         return;
       }
       
-      // 检查文件类型，仅接受文本文件、PDF和文档
-      const acceptedTypes = ['text/plain', 'application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+      // 检查文件类型，接受更多类型的文件
+      const acceptedTypes = [
+        'text/plain', 
+        'application/pdf', 
+        'application/msword', 
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.ms-powerpoint',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+      ];
       
-      // 由于浏览器可能不会准确识别所有文件类型，我们也接受某些特定扩展名
+      // 接受更多扩展名
       const fileName = file.name.toLowerCase();
-      const isAcceptableExtension = ['.txt', '.pdf', '.doc', '.docx'].some(ext => fileName.endsWith(ext));
+      const isAcceptableExtension = ['.txt', '.pdf', '.doc', '.docx', '.ppt', '.pptx'].some(ext => fileName.endsWith(ext));
       
       // 如果文件类型不在接受列表中，且扩展名也不被接受，则拒绝
       if (!acceptedTypes.includes(file.type) && !isAcceptableExtension) {
-        setMessage(`不支持的文件类型，请上传文本文件、PDF或Word文档`);
+        setMessage(`不支持的文件类型，请上传文本文件、PDF、Word文档或PPT文件`);
         return;
       }
       
       setSelectedFile(file);
-      setMessage(`已选择文件: ${file.name}`);
-    }
-  };
-  
-  // 辅助函数：读取文件内容
-  const readFileContent = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      // 针对不同文件类型使用不同的处理策略
-      const fileName = file.name.toLowerCase();
       
-      // 如果是非文本文件(如PDF或DOC)，使用特殊提示
-      if (!fileName.endsWith('.txt') && !fileName.endsWith('.md')) {
-        // 对于PDF文件，提供更具体的描述请求
-        if (fileName.endsWith('.pdf')) {
-          resolve(`这是一个PDF文件，名为"${file.name}"，大小为${(file.size / 1024).toFixed(2)}KB。
-请根据这个PDF文件可能的主题（从文件名推测），生成5个相关领域的单选题。
-文件名: ${file.name}`);
-        } else {
-          // 其他非文本文件
-          resolve(`这是一个文档文件，名为"${file.name}"，大小为${(file.size / 1024).toFixed(2)}KB。
-请根据这个文件名，生成5个相关领域的单选题。
-文件名: ${file.name}`);
-        }
-        return;
+      // 根据文件类型显示不同消息
+      if (fileName.endsWith('.txt')) {
+        setMessage(`已选择文本文件: ${file.name}，将提取内容用于生成测验题`);
+      } else if (fileName.endsWith('.pdf')) {
+        setMessage(`已选择PDF文件: ${file.name}，将尝试提取内容用于生成测验题`);
+      } else if (fileName.endsWith('.doc') || fileName.endsWith('.docx')) {
+        setMessage(`已选择Word文档: ${file.name}，将尝试提取内容用于生成测验题`);
+      } else if (fileName.endsWith('.ppt') || fileName.endsWith('.pptx')) {
+        setMessage(`已选择PowerPoint文件: ${file.name}，将尝试提取内容用于生成测验题`);
+      } else {
+        setMessage(`已选择文件: ${file.name}`);
       }
-      
-      // 处理文本文件
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          // 限制文本长度
-          const text = event.target.result.toString();
-          const maxLength = 20000; // 最大字符数
-          
-          if (text.length > maxLength) {
-            const truncated = text.substring(0, maxLength) + "\n\n... [内容过长，已截断] ...";
-            resolve(truncated);
-          } else {
-            resolve(text);
-          }
-        } else {
-          reject(new Error("读取文件失败"));
-        }
-      };
-      reader.onerror = () => reject(new Error("读取文件时出错"));
-      reader.readAsText(file);
-    });
+    }
   };
   
   const handleProcessWithAI = async () => {
@@ -269,44 +243,114 @@ export default function OrganizerPage() {
     
     // 开始AI处理
     setProcessingAI(true);
-    setMessage("AI正在分析内容并生成问卷...");
+    
+    const fileName = selectedFile.name;
+    const fileExtension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
+    const fileType = getFileTypeDescription(fileExtension);
+    
+    setMessage(`正在处理${fileType}，请稍候...`);
     setGeneratedQuestions(null); // 清除之前的结果
     
     try {
-      // 读取文件内容
       let content = "";
-      if (selectedFile) {
+      
+      // 显示处理阶段
+      if (['.txt', '.md'].includes(fileExtension)) {
+        setMessage("正在读取文本文件内容...");
+      } else if (['.pdf', '.doc', '.docx', '.ppt', '.pptx'].includes(fileExtension)) {
+        setMessage(`正在提取${fileType}内容，这可能需要一点时间...`);
+      } else {
+        setMessage(`正在处理${fileType}...`);
+      }
+      
+      // 如果是文本文件，直接读取内容
+      if (['.txt', '.md'].includes(fileExtension)) {
         try {
-          content = await readFileContent(selectedFile);
-          console.log("已读取文件内容，长度:", content.length);
+          content = await readFileAsText(selectedFile);
+          console.log("已读取文本文件内容，长度:", content.length);
         } catch (readError: any) {
           console.error("读取文件错误:", readError);
           throw new Error(`无法读取文件: ${readError.message}`);
         }
+      } 
+      // 如果是PDF或其他支持的文件类型，通过API提取内容
+      else if (['.pdf', '.doc', '.docx', '.ppt', '.pptx'].includes(fileExtension)) {
+        // 创建表单数据上传文件
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        // 调用文件内容提取API
+        const response = await fetch('/api/extract-content', {
+          method: 'POST',
+          body: formData
+        });
+        
+        // 即使发生错误也尝试解析响应
+        const result = await response.json();
+        
+        // 如果有错误但有内容，我们仍然可以使用
+        if (result.error && !result.content) {
+          throw new Error(`内容提取失败: ${result.error || response.statusText}`);
+        }
+        
+        if (!result.content) {
+          throw new Error("未能提取到文件内容");
+        }
+        
+        content = result.content;
+        console.log("通过API提取的内容长度:", content.length);
+        
+        // 如果内容太短，可能是提取失败
+        if (content.length < 50) {
+          console.warn("提取的内容可能不完整:", content);
+        }
+      } else {
+        throw new Error(`不支持的文件类型: ${fileExtension}`);
       }
       
+      // 检查内容是否为空
       if (!content.trim()) {
-        throw new Error("文件内容为空");
+        throw new Error("无法获取有效内容");
       }
       
-      console.log("准备发送到API的内容长度:", content.length);
+      // 去除任何可能导致JSON解析问题的HTML内容
+      const safeContent = content
+        .replace(/<\!DOCTYPE[^>]*>/gi, '')
+        .replace(/<html[^>]*>/gi, '')
+        .replace(/<\/html>/gi, '')
+        .replace(/<head>[\s\S]*?<\/head>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]*>/g, ' '); // 移除其他HTML标签
       
-      // 调用API生成测验
+      setMessage("AI正在分析内容并生成测验题目...");
+      
+      // 调用AI生成测验
       const response = await fetch("/api/ai/generate-quiz", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ content })
+        body: JSON.stringify({ 
+          content: safeContent,
+          filename: fileName,
+          fileType: fileExtension
+        })
       });
       
-      console.log("API响应状态:", response.status);
+      console.log("AI生成API响应状态:", response.status);
       
-      const result = await response.json();
-      console.log("API返回结果:", result);
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`AI生成测验失败 (${response.status}): ${errorText}`);
+      }
       
-      if (result.error) {
-        throw new Error(`API错误: ${result.error} ${result.details || ''}`);
+      let result;
+      try {
+        result = await response.json();
+      } catch (jsonError) {
+        console.error("解析API响应JSON失败:", jsonError);
+        throw new Error("无法解析API返回的数据");
       }
       
       // 确保result包含questions数组
@@ -317,7 +361,7 @@ export default function OrganizerPage() {
       // 显示生成的问题
       setGeneratedQuestions(result);
       setProcessingAI(false);
-      setMessage("已成功生成测验题目");
+      setMessage(`已成功根据${fileType}内容生成测验题目`);
       
     } catch (error: any) {
       console.error("AI处理失败:", error);
@@ -325,7 +369,73 @@ export default function OrganizerPage() {
       setMessage(`生成测验失败: ${error.message}`);
     }
   };
+  
+  // 获取文件类型描述
+  const getFileTypeDescription = (extension: string): string => {
+    switch (extension) {
+      case '.txt': return '文本文件';
+      case '.pdf': return 'PDF文件';
+      case '.doc':
+      case '.docx': return 'Word文档';
+      case '.ppt':
+      case '.pptx': return 'PowerPoint演示文稿';
+      default: return '文件';
+    }
+  };
 
+  // 读取文件为文本
+  const readFileAsText = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          const text = event.target.result.toString();
+          const maxLength = 50000; // 最大字符数限制
+          
+          if (text.length > maxLength) {
+            resolve(text.substring(0, maxLength) + "\n\n... [内容过长，已截断] ...");
+          } else {
+            resolve(text);
+          }
+        } else {
+          reject(new Error("读取文件失败"));
+        }
+      };
+      reader.onerror = () => reject(new Error("读取文件时出错"));
+      reader.readAsText(file);
+    });
+  };
+  
+  // 读取文件为Base64
+  const readFileAsBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          // 从ArrayBuffer获取Base64
+          const arrayBuffer = event.target.result;
+          let binary = '';
+          
+          if (arrayBuffer instanceof ArrayBuffer) {
+            const bytes = new Uint8Array(arrayBuffer);
+            const len = Math.min(bytes.byteLength, 1024 * 50); // 最多读取50KB内容
+            for (let i = 0; i < len; i++) {
+              binary += String.fromCharCode(bytes[i]);
+            }
+            const base64 = btoa(binary);
+            resolve(base64);
+          } else {
+            reject(new Error("无效的文件内容格式"));
+          }
+        } else {
+          reject(new Error("读取文件失败"));
+        }
+      };
+      reader.onerror = () => reject(new Error("读取文件时出错"));
+      reader.readAsArrayBuffer(file);
+    });
+  };
+  
   // 测验相关函数
   const handleSelectAnswer = (answer: string) => {
     setSelectedAnswers({
