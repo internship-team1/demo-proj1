@@ -248,123 +248,162 @@ export default function OrganizerPage() {
     const fileExtension = fileName.substring(fileName.lastIndexOf('.')).toLowerCase();
     const fileType = getFileTypeDescription(fileExtension);
     
-    setMessage(`正在处理${fileType}，请稍候...`);
-    setGeneratedQuestions(null); // 清除之前的结果
+    // 清除之前的结果
+    setGeneratedQuestions(null);
     
     try {
       let content = "";
+      let apiResult: { questions: any[] } | null = null;  // 存储API调用结果
+      let apiError: Error | null = null;   // 存储可能发生的错误
+      let progressComplete = false; // 标记进度条是否完成
       
-      // 显示处理阶段
-      if (['.txt', '.md'].includes(fileExtension)) {
-        setMessage("正在读取文本文件内容...");
-      } else if (['.pdf', '.doc', '.docx', '.ppt', '.pptx'].includes(fileExtension)) {
-        setMessage(`正在提取${fileType}内容，这可能需要一点时间...`);
-      } else {
-        setMessage(`正在处理${fileType}...`);
-      }
+      // 创建进度条计时器 - 保证运行6秒
+      let progressPercent = 0;
+      setMessage(`生成题目中... 0%`);
       
-      // 如果是文本文件，直接读取内容
-      if (['.txt', '.md'].includes(fileExtension)) {
+      const progressTimer = setInterval(() => {
+        progressPercent += 100/6; // 6秒完成
+        if (progressPercent >= 100) {
+          progressPercent = 100;
+          clearInterval(progressTimer);
+          progressComplete = true;
+          
+          // 如果API已完成，显示结果
+          if (apiResult) {
+            setGeneratedQuestions(apiResult);
+            setProcessingAI(false);
+            setMessage(`成功生成测验题目`);
+          } else if (apiError) {
+            setProcessingAI(false);
+            setMessage(`生成测验失败: ${apiError.message}`);
+          }
+        }
+        setMessage(`生成题目中... ${Math.round(progressPercent)}%`);
+      }, 1000);
+      
+      // 创建API调用的异步函数
+      const callAPI = async () => {
         try {
-          content = await readFileAsText(selectedFile);
-          console.log("已读取文本文件内容，长度:", content.length);
-        } catch (readError: any) {
-          console.error("读取文件错误:", readError);
-          throw new Error(`无法读取文件: ${readError.message}`);
+          // 如果是文本文件，直接读取内容
+          if (['.txt', '.md'].includes(fileExtension)) {
+            try {
+              content = await readFileAsText(selectedFile);
+              console.log("已读取文本文件内容，长度:", content.length);
+            } catch (readError: any) {
+              console.error("读取文件错误:", readError);
+              throw new Error(`无法读取文件: ${readError.message}`);
+            }
+          } 
+          // 如果是PDF或其他支持的文件类型，通过API提取内容
+          else if (['.pdf', '.doc', '.docx', '.ppt', '.pptx'].includes(fileExtension)) {
+            // 创建表单数据上传文件
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            // 调用文件内容提取API
+            const response = await fetch('/api/extract-content', {
+              method: 'POST',
+              body: formData
+            });
+            
+            // 即使发生错误也尝试解析响应
+            const result = await response.json();
+            
+            // 如果有错误但有内容，我们仍然可以使用
+            if (result.error && !result.content) {
+              throw new Error(`内容提取失败: ${result.error || response.statusText}`);
+            }
+            
+            if (!result.content) {
+              throw new Error("未能提取到文件内容");
+            }
+            
+            content = result.content;
+            console.log("通过API提取的内容长度:", content.length);
+            
+            // 如果内容太短，可能是提取失败
+            if (content.length < 50) {
+              console.warn("提取的内容可能不完整:", content);
+            }
+          } else {
+            throw new Error(`不支持的文件类型: ${fileExtension}`);
+          }
+          
+          // 检查内容是否为空
+          if (!content.trim()) {
+            throw new Error("无法获取有效内容");
+          }
+          
+          // 去除任何可能导致JSON解析问题的HTML内容
+          const safeContent = content
+            .replace(/<\!DOCTYPE[^>]*>/gi, '')
+            .replace(/<html[^>]*>/gi, '')
+            .replace(/<\/html>/gi, '')
+            .replace(/<head>[\s\S]*?<\/head>/gi, '')
+            .replace(/<script[\s\S]*?<\/script>/gi, '')
+            .replace(/<style[\s\S]*?<\/style>/gi, '')
+            .replace(/<[^>]*>/g, ' '); // 移除其他HTML标签
+          
+          // 调用AI生成测验
+          const response = await fetch("/api/ai/generate-quiz", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ 
+              content: safeContent,
+              filename: fileName,
+              fileType: fileExtension
+            })
+          });
+          
+          console.log("AI生成API响应状态:", response.status);
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`AI生成测验失败 (${response.status}): ${errorText}`);
+          }
+          
+          let result;
+          try {
+            result = await response.json();
+          } catch (jsonError) {
+            console.error("解析API响应JSON失败:", jsonError);
+            throw new Error("无法解析API返回的数据");
+          }
+          
+          // 确保result包含questions数组
+          if (!result.questions || !Array.isArray(result.questions) || result.questions.length === 0) {
+            throw new Error("API返回的数据结构不正确，缺少questions数组");
+          }
+          
+          // 保存API结果，但不立即显示
+          apiResult = result;
+          
+          // 如果进度条已完成，显示结果
+          if (progressComplete) {
+            setGeneratedQuestions(result);
+            setProcessingAI(false);
+            setMessage(`成功生成测验题目`);
+          }
+          
+        } catch (error: any) {
+          console.error("AI处理失败:", error);
+          apiError = error;
+          
+          // 如果进度条已完成，显示错误
+          if (progressComplete) {
+            setProcessingAI(false);
+            setMessage(`生成测验失败: ${error.message}`);
+          }
         }
-      } 
-      // 如果是PDF或其他支持的文件类型，通过API提取内容
-      else if (['.pdf', '.doc', '.docx', '.ppt', '.pptx'].includes(fileExtension)) {
-        // 创建表单数据上传文件
-        const formData = new FormData();
-        formData.append('file', selectedFile);
-        
-        // 调用文件内容提取API
-        const response = await fetch('/api/extract-content', {
-          method: 'POST',
-          body: formData
-        });
-        
-        // 即使发生错误也尝试解析响应
-        const result = await response.json();
-        
-        // 如果有错误但有内容，我们仍然可以使用
-        if (result.error && !result.content) {
-          throw new Error(`内容提取失败: ${result.error || response.statusText}`);
-        }
-        
-        if (!result.content) {
-          throw new Error("未能提取到文件内容");
-        }
-        
-        content = result.content;
-        console.log("通过API提取的内容长度:", content.length);
-        
-        // 如果内容太短，可能是提取失败
-        if (content.length < 50) {
-          console.warn("提取的内容可能不完整:", content);
-        }
-      } else {
-        throw new Error(`不支持的文件类型: ${fileExtension}`);
-      }
+      };
       
-      // 检查内容是否为空
-      if (!content.trim()) {
-        throw new Error("无法获取有效内容");
-      }
-      
-      // 去除任何可能导致JSON解析问题的HTML内容
-      const safeContent = content
-        .replace(/<\!DOCTYPE[^>]*>/gi, '')
-        .replace(/<html[^>]*>/gi, '')
-        .replace(/<\/html>/gi, '')
-        .replace(/<head>[\s\S]*?<\/head>/gi, '')
-        .replace(/<script[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[\s\S]*?<\/style>/gi, '')
-        .replace(/<[^>]*>/g, ' '); // 移除其他HTML标签
-      
-      setMessage("AI正在分析内容并生成测验题目...");
-      
-      // 调用AI生成测验
-      const response = await fetch("/api/ai/generate-quiz", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ 
-          content: safeContent,
-          filename: fileName,
-          fileType: fileExtension
-        })
-      });
-      
-      console.log("AI生成API响应状态:", response.status);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`AI生成测验失败 (${response.status}): ${errorText}`);
-      }
-      
-      let result;
-      try {
-        result = await response.json();
-      } catch (jsonError) {
-        console.error("解析API响应JSON失败:", jsonError);
-        throw new Error("无法解析API返回的数据");
-      }
-      
-      // 确保result包含questions数组
-      if (!result.questions || !Array.isArray(result.questions) || result.questions.length === 0) {
-        throw new Error("API返回的数据结构不正确，缺少questions数组");
-      }
-      
-      // 显示生成的问题
-      setGeneratedQuestions(result);
-      setProcessingAI(false);
-      setMessage(`已成功根据${fileType}内容生成测验题目`);
+      // 执行API调用
+      callAPI();
       
     } catch (error: any) {
-      console.error("AI处理失败:", error);
+      console.error("处理失败:", error);
       setProcessingAI(false);
       setMessage(`生成测验失败: ${error.message}`);
     }
