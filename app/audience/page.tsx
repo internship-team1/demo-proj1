@@ -47,38 +47,41 @@ export default function AudiencePage() {
 
 // 添加检查新问卷的函数
 const checkNewQuizzes = async () => {
-  // 添加防御性检查
-  if (!currentUser?.id || courses.length === 0) {
-    console.warn('检查中止：缺少用户ID或课程数据', {
-      userId: currentUser?.id,
-      courseCount: courses.length
-    });
-    return;
-  }
-
   try {
     const params = new URLSearchParams({
-      courseIds: courses.map(c => c.id).join(','),
-      userId: currentUser.id.toString() // 确保是字符串
+      userId: currentUser.id.toString(),
+      courseIds: courses.map(c => c.id).join(',')
     });
 
     const res = await fetch(`/api/quiz/recent?${params}`);
+    const quizzes = await res.json();
     
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || `HTTP ${res.status}`);
+    // 调试日志 - 确认数据获取
+    console.log('获取到的问卷:', quizzes);
+    console.log('当前弹窗状态:', newQuizAlert);
+
+    // 确保处理数组数据
+    if (!Array.isArray(quizzes)) {
+      console.error('API返回数据格式错误');
+      return;
     }
 
-    const quizzes = await res.json();
-    const lastCheck = localStorage.getItem('lastQuizCheck') || '0';
-    
-    const unseenQuiz = quizzes.find((q: any) => 
-      new Date(q.createdAt).getTime() > parseInt(lastCheck)
+    const viewedQuizzes = JSON.parse(
+      localStorage.getItem('viewedQuizzes') || '[]'
     );
 
-    if (unseenQuiz) {
-      setNewQuizAlert({
-        show: true,
+    // 找出第一个未查看的有效问卷
+    const unseenQuiz = quizzes.find(q => 
+      q?.id && 
+      !viewedQuizzes.includes(q.id)
+    );
+
+    // 调试日志 - 确认找到的问卷
+    console.log('未查看的问卷:', unseenQuiz);
+
+    if (unseenQuiz && !newQuizAlert.show) {  // 添加弹窗未显示的条件
+      setNewQuizAlert({ 
+        show: true, 
         quiz: {
           id: unseenQuiz.id,
           title: unseenQuiz.title,
@@ -88,20 +91,24 @@ const checkNewQuizzes = async () => {
     }
   } catch (error) {
     console.error('检查失败:', error);
-    // 友好错误提示
-    setMessage('检查新问卷失败: ' + (error instanceof Error ? error.message : String(error)));
-    setTimeout(() => setMessage(''), 3000);
   }
 };
 
+// 组件中添加调试监听
 useEffect(() => {
-  // 仅在课程界面且用户已登录时检查
+  console.log('弹窗状态变化:', newQuizAlert);
+}, [newQuizAlert]);
+
+useEffect(() => {
   if (activeTab === "courses" && currentUser?.id && courses.length > 0) {
-    checkNewQuizzes()
-    const timer = setInterval(checkNewQuizzes, 5 * 60 * 1000)
-    return () => clearInterval(timer)
+    // 首次立即检查
+    checkNewQuizzes(); 
+    
+    // 改为每10秒检查一次（原为5分钟）
+    const timer = setInterval(checkNewQuizzes, 10 * 1000); 
+    return () => clearInterval(timer);
   }
-}, [activeTab, currentUser?.id, courses]) // 关键依赖项
+}, [activeTab, currentUser?.id, courses]);
 
 useEffect(() => {
   console.log('【DEBUG】当前状态:', {
@@ -622,29 +629,53 @@ const handleUpdatePassword = async () => {
       )}
 
       {/* 新问卷提醒 */}
-      {activeTab === "courses" && newQuizAlert.show && (
+{activeTab === "courses" && newQuizAlert.show && (
   <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
     <div className="bg-white p-6 rounded-lg animate-pop-in">
       <h3 className="text-xl font-bold mb-2">📢 新问卷通知</h3>
       <p>{newQuizAlert.quiz?.title}</p>
       <div className="flex gap-3 mt-4">
-        <button 
-          onClick={() => setNewQuizAlert({...newQuizAlert, show: false})}
-          className="flex-1 py-2 border rounded"
+        <button
+          onClick={() => {
+            // 1. 记录已忽略的问卷ID
+            const viewedQuizzes = JSON.parse(
+              localStorage.getItem('viewedQuizzes') || '[]'
+            );
+            
+            if (newQuizAlert.quiz?.id && !viewedQuizzes.includes(newQuizAlert.quiz.id)) {
+              localStorage.setItem(
+                'viewedQuizzes',
+                JSON.stringify([...viewedQuizzes, newQuizAlert.quiz.id])
+              );
+            }
+
+            // 2. 仅关闭弹窗，不跳转
+            setNewQuizAlert({ show: false });
+          }}
+          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
         >
-          稍后
+          忽略
         </button>
-      <button
-  onClick={() => {
-    if (newQuizAlert.quiz) {
-      router.push(`/audience/quiz/${newQuizAlert.quiz.courseId}?quizId=${newQuizAlert.quiz.id}`);
-      setNewQuizAlert({ show: false });
-    }
-  }}
-  className="flex-1 py-2 bg-blue-500 text-white rounded"
->
-  查看
-</button>
+        <button
+          onClick={() => {
+            const viewedQuizzes = JSON.parse(
+              localStorage.getItem('viewedQuizzes') || '[]'
+            );
+            
+            if (newQuizAlert.quiz?.id && !viewedQuizzes.includes(newQuizAlert.quiz.id)) {
+              localStorage.setItem(
+                'viewedQuizzes',
+                JSON.stringify([...viewedQuizzes, newQuizAlert.quiz.id])
+              );
+            }
+
+            router.push(`/audience/quiz/${newQuizAlert.quiz?.courseId}`);
+            setNewQuizAlert({ show: false });
+          }}
+          className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
+        >
+          查看
+        </button>
       </div>
     </div>
   </div>
