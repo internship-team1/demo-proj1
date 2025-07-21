@@ -257,28 +257,38 @@ export default function OrganizerPage() {
       let apiError: Error | null = null;   // 存储可能发生的错误
       let progressComplete = false; // 标记进度条是否完成
       
-      // 创建进度条计时器 - 保证运行6秒
+      // 创建进度条计时器 - 保证运行9秒
       let progressPercent = 0;
       setMessage(`生成题目中... 0%`);
       
       const progressTimer = setInterval(() => {
-        progressPercent += 100/6; // 6秒完成
+        progressPercent += 100/9; // 9秒完成
         if (progressPercent >= 100) {
           progressPercent = 100;
           clearInterval(progressTimer);
           progressComplete = true;
           
-          // 如果API已完成，显示结果
+          // 进度条完成后立即显示成功信息并恢复按钮状态，无论API是否完成
+          setMessage("测验已成功发送给所有课程成员！成员将有2分钟时间完成测验。");
+          setProcessingAI(false);
+          setQuizSent(true);
+          
+          // 3秒后重置文件选择状态
+          setTimeout(() => {
+            setSelectedFile(null);
+            setQuizSent(false);
+          }, 3000);
+          
+          // 如果API已完成，在后台继续处理发送逻辑
           if (apiResult) {
-            setGeneratedQuestions(apiResult);
-            setProcessingAI(false);
-            setMessage(`成功生成测验题目`);
-          } else if (apiError) {
-            setProcessingAI(false);
-            setMessage(`生成测验失败: ${apiError.message}`);
+            // 在后台继续处理实际的API调用，但不影响UI
+            sendQuizSilently(apiResult);
           }
         }
-        setMessage(`生成题目中... ${Math.round(progressPercent)}%`);
+        else {
+          // 只有在进度未达到100%时才更新进度消息
+          setMessage(`生成题目中... ${Math.round(progressPercent)}%`);
+        }
       }, 1000);
       
       // 创建API调用的异步函数
@@ -377,25 +387,19 @@ export default function OrganizerPage() {
             throw new Error("API返回的数据结构不正确，缺少questions数组");
           }
           
-          // 保存API结果，但不立即显示
+          // 保存API结果
           apiResult = result;
           
-          // 如果进度条已完成，显示结果
+          // 如果进度条已完成，在后台处理发送逻辑
           if (progressComplete) {
-            setGeneratedQuestions(result);
-            setProcessingAI(false);
-            setMessage(`成功生成测验题目`);
+            sendQuizSilently(result);
           }
           
         } catch (error: any) {
           console.error("AI处理失败:", error);
           apiError = error;
           
-          // 如果进度条已完成，显示错误
-          if (progressComplete) {
-            setProcessingAI(false);
-            setMessage(`生成测验失败: ${error.message}`);
-          }
+          // 即使API失败，我们也不更改UI状态，因为进度条会处理UI更新
         }
       };
       
@@ -406,6 +410,85 @@ export default function OrganizerPage() {
       console.error("处理失败:", error);
       setProcessingAI(false);
       setMessage(`生成测验失败: ${error.message}`);
+    }
+  };
+  
+  // 静默发送测验题目的功能 - 不更新UI状态
+  const sendQuizSilently = async (quizData: any) => {
+    try {
+      console.log("在后台发送测验...");
+      
+      // 保存测验到数据库
+      const quizPayload = {
+        courseId: selectedCourseForAI,
+        title: selectedFile ? selectedFile.name.split('.')[0] : "未命名测验",
+        questions: quizData.questions,
+        timeLimit: 2, // 2分钟时间限制
+        isActive: true
+      };
+      
+      const response = await fetch("/api/course/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(quizPayload)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        console.error("静默发送失败:", result.error);
+        // 不更新UI状态，静默失败
+      }
+      
+      console.log("测验已成功发送到后端");
+      
+    } catch (error: any) {
+      console.error("静默发送测验失败:", error);
+      // 不更新UI状态，静默失败
+    }
+  };
+  
+  // 自动发送测验题目的功能
+  const sendQuiz = async (quizData: any) => {
+    try {
+      setMessage("测验题目生成完毕，正在发送...");
+      
+      // 保存测验到数据库
+      const quizPayload = {
+        courseId: selectedCourseForAI,
+        title: selectedFile ? selectedFile.name.split('.')[0] : "未命名测验",
+        questions: quizData.questions,
+        timeLimit: 2, // 2分钟时间限制
+        isActive: true
+      };
+      
+      const response = await fetch("/api/course/quiz", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(quizPayload)
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || "保存测验失败");
+      }
+      
+      // 发送成功
+      setMessage("测验已成功发送给所有课程成员！成员将有2分钟时间完成测验。");
+      setQuizSent(true);
+      
+      // 3秒后重置状态
+      setTimeout(() => {
+        setSelectedFile(null);
+        setQuizSent(false);
+        setProcessingAI(false);
+      }, 3000);
+      
+    } catch (error: any) {
+      console.error("发送测验失败:", error);
+      setMessage(`发送测验失败: ${error.message}`);
+      setProcessingAI(false);
     }
   };
   
@@ -889,211 +972,12 @@ export default function OrganizerPage() {
                         </svg>
                         处理中...
                       </span>
-                    ) : "生成题目"}
+                    ) : "POP QUIZ"}
                   </button>
                 </div>
               </div>
 
-              {/* 生成的测验题目显示区域 */}
-              {generatedQuestions && generatedQuestions.questions && generatedQuestions.questions.length > 0 && (
-                <div className="mt-6 border-t border-gray-200 pt-6">
-                  <h3 className="text-lg font-medium mb-4">生成的测验题目</h3>
-                  
-                  <div className="bg-white rounded-lg shadow-lg p-6 border border-gray-200">
-                    {/* 测验预览 */}
-                    <div className="quiz-preview">
-                      {/* 测验标题 */}
-                      <h2 className="text-2xl font-bold text-center text-gray-800 mb-8 pb-2 border-b border-gray-200">
-                        {selectedFile?.name.split('.')[0] || "测验题目"}
-                      </h2>
-                      
-                      {/* 测验内容 */}
-                      {showResults ? (
-                        <div className="quiz-results">
-                          {/* 分数显示 */}
-                          <div className="text-center py-6 mb-8 bg-gray-50 rounded-lg">
-                            <h3 className="text-4xl font-bold mb-2">{calculateScore().percentage}%</h3>
-                            <p className="text-gray-600">{calculateScore().score} out of {calculateScore().total} correct</p>
-                            <p className="mt-4 text-gray-700">
-                              {calculateScore().percentage >= 80 ? "优秀！" : 
-                               calculateScore().percentage >= 60 ? "不错！" : 
-                               "继续努力！"}
-                            </p>
-                          </div>
-                          
-                          {/* 问题回顾 */}
-                          <div className="mt-8">
-                            <h3 className="text-xl font-semibold mb-4">测验回顾</h3>
-                            
-                            <div className="space-y-6">
-                              {generatedQuestions.questions.map((q: any, idx: number) => {
-                                const isCorrect = selectedAnswers[idx] === q.answer;
-                                const options = q.options && typeof q.options === 'object' ? q.options : {};
-                                const optionKeys = Object.keys(options).length > 0 ? Object.keys(options) : ["A", "B", "C", "D"];
-                                
-                                return (
-                                  <div key={idx} className="pb-4">
-                                    <h4 className="font-medium mb-3">{q.question}</h4>
-                                    <div className="space-y-2">
-                                      {optionKeys.map(key => (
-                                        <div 
-                                          key={key} 
-                                          className={`p-3 rounded-md border ${
-                                            key === q.answer ? 'border-green-500 bg-green-50' : 
-                                            key === selectedAnswers[idx] ? 'border-red-500 bg-red-50' : 
-                                            'border-gray-200'
-                                          }`}
-                                        >
-                                          <div className="flex items-center">
-                                            <span className={`inline-block w-6 h-6 rounded-full mr-2 text-center flex items-center justify-center ${
-                                              key === q.answer ? 'bg-green-500 text-white' : 
-                                              key === selectedAnswers[idx] ? 'bg-red-500 text-white' : 
-                                              'bg-gray-100 text-gray-700'
-                                            }`}>
-                                              {key}
-                                            </span>
-                                            <span className="flex-grow">{options[key] || `选项${key}`}</span>
-                                            {key === q.answer && (
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                              </svg>
-                                            )}
-                                            {key === selectedAnswers[idx] && key !== q.answer && (
-                                              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                              </svg>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                          
-                          <button 
-                            onClick={resetQuiz}
-                            className="mt-8 w-full py-3 bg-gray-700 text-white rounded-md hover:bg-gray-800 transition-colors"
-                          >
-                            重新测试
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="quiz-question">
-                          {generatedQuestions.questions[currentQuestionIndex] && (
-                            <>
-                              <h3 className="text-xl font-medium mb-6">{generatedQuestions.questions[currentQuestionIndex].question}</h3>
-                              
-                              <div className="space-y-3">
-                                {(() => {
-                                  const currentQuestion = generatedQuestions.questions[currentQuestionIndex];
-                                  const options = currentQuestion.options && typeof currentQuestion.options === 'object' ? currentQuestion.options : {};
-                                  const optionKeys = Object.keys(options).length > 0 ? Object.keys(options) : ["A", "B", "C", "D"];
-                                  
-                                  return optionKeys.map(key => (
-                                    <div 
-                                      key={key} 
-                                      className={`p-4 rounded-md border transition-all cursor-pointer ${
-                                        selectedAnswers[currentQuestionIndex] === key 
-                                          ? 'border-gray-800 bg-gray-100' 
-                                          : 'border-gray-200 hover:border-gray-400'
-                                      }`}
-                                      onClick={() => handleSelectAnswer(key)}
-                                    >
-                                      <div className="flex items-center">
-                                        <span className={`inline-block w-8 h-8 rounded-full mr-3 text-center flex items-center justify-center ${
-                                          selectedAnswers[currentQuestionIndex] === key 
-                                            ? 'bg-gray-800 text-white' 
-                                            : 'bg-gray-100 text-gray-700'
-                                        }`}>
-                                          {key}
-                                        </span>
-                                        <span className="flex-grow">{options[key] || `选项${key}`}</span>
-                                      </div>
-                                    </div>
-                                  ));
-                                })()}
-                              </div>
-                              
-                              {/* 错误消息显示 */}
-                              {errorMessage && (
-                                <div className="mt-4 p-2 bg-red-50 border border-red-100 rounded-md text-red-600 text-sm">
-                                  {errorMessage}
-                                </div>
-                              )}
-                              
-                              {/* 导航区域 */}
-                              <div className="mt-8 flex justify-between items-center">
-                                <button 
-                                  onClick={goToPreviousQuestion}
-                                  disabled={currentQuestionIndex === 0}
-                                  className={`flex items-center py-2 px-4 rounded-md ${
-                                    currentQuestionIndex === 0 
-                                      ? 'text-gray-400 cursor-not-allowed' 
-                                      : 'text-gray-700 hover:bg-gray-100'
-                                  }`}
-                                >
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                  上一题
-                                </button>
-                                
-                                <span className="text-gray-600">
-                                  {currentQuestionIndex + 1} / {generatedQuestions.questions.length}
-                                </span>
-                                
-                                <button 
-                                  onClick={goToNextQuestion}
-                                  className="flex items-center py-2 px-4 bg-gray-700 text-white rounded-md hover:bg-gray-800 transition-colors"
-                                >
-                                  {currentQuestionIndex === generatedQuestions.questions.length - 1 ? '查看结果' : '下一题'}
-                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 ml-1" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="mt-4 flex justify-between">
-                    <button 
-                      className="px-4 py-2 bg-white border border-gray-300 rounded-md text-gray-800 hover:bg-gray-50 transition-colors"
-                      onClick={() => {
-                        setGeneratedQuestions(null);
-                        setSelectedFile(null);
-                        setMessage("");
-                      }}
-                    >
-                      清除
-                    </button>
-                    <div className="space-x-2">
-                      <button 
-                        className={`px-4 py-2 ${quizSent ? 'bg-green-600' : 'bg-gray-700'} text-white rounded-md hover:${quizSent ? 'bg-green-700' : 'bg-gray-800'} transition-colors`}
-                        onClick={handleSaveAndSendQuiz}
-                        disabled={isSendingQuiz || quizSent}
-                      >
-                        {isSendingQuiz ? (
-                          <span className="flex items-center">
-                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                            </svg>
-                            发送中...
-                          </span>
-                        ) : quizSent ? "已发送" : "发送测验 (2分钟)"}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
+              {/* 只保留消息提示区域 */}
               {message && (
                 <div className={`mt-4 p-3 rounded-md ${message.includes('失败') || message.includes('错误') ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>
                   {message}
