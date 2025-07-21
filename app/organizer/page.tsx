@@ -33,6 +33,11 @@ interface Message {
 interface QuizStatistics {
   quizId: number;
   quizTitle: string;
+  audienceCount: number;
+  submittedCount: number;
+  notSubmitRate: number;
+  errorRate: number;
+  presentationEffectiveness: number;
   questions: {
     questionId: number;
     questionText: string;
@@ -42,7 +47,7 @@ interface QuizStatistics {
 }
 
 export default function OrganizerPage() {
-  const [activeTab, setActiveTab] = useState("courses");
+  const [activeTab, setActiveTab] = useState<"courses" | "statistics" | "settings">("courses");
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<any>(null);
   
@@ -88,6 +93,7 @@ export default function OrganizerPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const [quizStatistics, setQuizStatistics] = useState<QuizStatistics[]>([]);
+  const [isLoadingStatistics, setIsLoadingStatistics] = useState(false);
 
   const [showStatisticsNotification, setShowStatisticsNotification] = useState(false);
   const [statisticsNotificationTimeout, setStatisticsNotificationTimeout] = useState<NodeJS.Timeout | null>(null);
@@ -772,13 +778,10 @@ export default function OrganizerPage() {
     }
   };
 
+  // 修改统计数据加载方式
   useEffect(() => {
     if (activeTab === "statistics" && selectedCourse) {
-      // 拉取统计数据
-      fetch(`/api/quiz/statistics?courseId=${selectedCourse}`)
-        .then(res => res.json())
-        .then(setQuizStatistics);
-      // 拉取该课程的所有问卷
+      // 只拉取问卷列表
       fetch(`/api/quiz/list?courseId=${selectedCourse}`)
         .then(res => res.json())
         .then(data => {
@@ -786,6 +789,27 @@ export default function OrganizerPage() {
         });
     }
   }, [activeTab, selectedCourse]);
+
+  // 添加根据选择的问卷ID加载统计数据的函数
+  const fetchQuizStatistics = async (quizId: number) => {
+    setIsLoadingStatistics(true);
+    try {
+      const res = await fetch(`/api/quiz/statistics?courseId=${selectedCourse}&quizId=${quizId}`);
+      const data = await res.json();
+      setQuizStatistics(data);
+    } catch (error) {
+      console.error("获取问卷统计数据失败:", error);
+    } finally {
+      setIsLoadingStatistics(false);
+    }
+  };
+
+  // 问卷选择变化时加载统计数据
+  useEffect(() => {
+    if (selectedQuiz) {
+      fetchQuizStatistics(selectedQuiz);
+    }
+  }, [selectedQuiz]);
 
   const checkNewStatisticsNotification = async () => {
     if (!currentUser) return;
@@ -1086,20 +1110,60 @@ export default function OrganizerPage() {
                         <h3 className="text-xl font-medium text-gray-800">问卷统计</h3>
                       </div>
                       
-                      {quizStatistics
-                        .filter(q => q.quizId === selectedQuiz)
-                        .map(quiz => (
-                          <div key={quiz.quizId}>
-                            {quiz.questions.map(q => (
-                              <div key={q.questionId} className="mb-4 p-4 bg-gray-50 rounded border">
-                                <div className="font-medium mb-2">{q.questionText}</div>
-                                <div className="text-sm text-gray-700">
-                                  答题人数：{q.total}，答对人数：{q.correct}
+                      {isLoadingStatistics ? (
+                        <div className="flex justify-center items-center p-12">
+                          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                          <span className="ml-3 text-gray-600">加载中...</span>
+                        </div>
+                      ) : (
+                        quizStatistics
+                          .filter(q => q.quizId === selectedQuiz)
+                          .map(quiz => (
+                            <div key={quiz.quizId}>
+                              <div className="mb-4 p-4 bg-gray-50 rounded border">
+                                {/* 移除了问卷标题 */}
+                                <div className="flex">
+                                  <div className="bg-blue-50 p-4 rounded-md border border-blue-100 w-1/3">
+                                    <div className="text-md text-blue-800 font-medium">演讲效果</div>
+                                    <div className="mt-2 flex items-end justify-center">
+                                      <div className="text-6xl font-bold text-blue-700 leading-none">{quiz.presentationEffectiveness}</div>
+                                      <div className="text-2xl font-bold text-blue-700 ml-1 mb-1.5">分</div>
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex-1 grid grid-cols-2 gap-2 ml-3">
+                                    <div className="bg-white p-2 rounded shadow-sm">
+                                      <div className="text-sm text-gray-500">听众数</div>
+                                      <div className="text-lg font-bold">{quiz.audienceCount}</div>
+                                    </div>
+                                    <div className="bg-white p-2 rounded shadow-sm">
+                                      <div className="text-sm text-gray-500">提交人数</div>
+                                      <div className="text-lg font-bold">{quiz.submittedCount}</div>
+                                    </div>
+                                    <div className="bg-white p-2 rounded shadow-sm">
+                                      <div className="text-sm text-gray-500">未提交率</div>
+                                      <div className="text-lg font-bold">{quiz.notSubmitRate}%</div>
+                                    </div>
+                                    <div className="bg-white p-2 rounded shadow-sm">
+                                      <div className="text-sm text-gray-500">平均错误率</div>
+                                      <div className="text-lg font-bold">{quiz.errorRate}%</div>
+                                    </div>
+                                  </div>
                                 </div>
                               </div>
-                            ))}
-                          </div>
-                        ))}
+                              
+                              <h4 className="text-md font-medium mb-2 text-gray-700">题目统计</h4>
+                              {quiz.questions.map(q => (
+                                <div key={q.questionId} className="mb-4 p-4 bg-gray-50 rounded border">
+                                  <div className="font-medium mb-2">{q.questionText}</div>
+                                  <div className="text-sm text-gray-700">
+                                    答题人数：{q.total}，答对人数：{q.correct}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          ))
+                      )}
                     </div>
                   ) : (
                     <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
