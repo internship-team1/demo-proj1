@@ -11,6 +11,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { content, filename, fileType } = body;
     
+    // 特殊处理PDF文件 - 只使用文件名，不使用内容
+    const isPdf = fileType?.toLowerCase() === 'pdf' || filename?.toLowerCase().endsWith('.pdf');
+    
+    // 如果是PDF文件，我们将只使用文件名
+    if (isPdf) {
+      if (!filename) {
+        throw new Error("处理PDF时需要提供文件名");
+      }
+      
+      console.log("检测到PDF文件，将只根据文件名生成问题:", filename);
+      
+      // 调用AI仅基于文件名生成问题
+      try {
+        const result = await callPdfByFilenameOnly(filename);
+        return NextResponse.json(result);
+      } catch (pdfError: any) {
+        console.error("PDF处理失败:", pdfError);
+        throw new Error(`无法基于PDF文件名生成问题: ${pdfError.message}`);
+      }
+    }
+    
+    // 以下是非PDF文件的处理逻辑
     if (!content) {
       throw new Error("没有提供有效的内容");
     }
@@ -65,6 +87,127 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       error: error.message || "生成测验题目时出现未知错误"
     }, { status: 500 });
+  }
+}
+
+// 专门处理PDF文件 - 仅基于文件名生成问题
+async function callPdfByFilenameOnly(filename: string) {
+  console.log("为PDF文件生成问题，仅基于文件名:", filename);
+  
+  const prompt = `
+  你是一位教育专家，精通生成测验题。
+
+  我有一个PDF文件，文件名为: "${filename}"
+  
+  请根据这个文件名猜测文件可能包含的内容和主题，然后生成5个相关的单选题来测试该主题的知识。
+  每个问题必须有4个选项(A,B,C,D)，并标明正确答案。
+  
+  严格要求：
+  1. 不要在题目或选项中提及或引用文件名
+  2. 不要使用"如果"、"假设"、"可能"、"推测"、"若"等猜测性语言
+  3. 直接以确定的口吻出题，就像你完全了解主题一样
+  4. 不要在题目中说明你是根据文件名猜测的
+  5. 生成的问题应该看起来像是基于实际内容创建的
+  6. 使用中文生成所有问题和选项
+  7. 确保问题与主题相关且具有教育价值
+  8. 选项应该合理且有区分度，包含一个正确答案和三个合理但不正确的干扰项
+  
+  请以下面的JSON格式返回:
+  {
+    "questions": [
+      {
+        "question": "问题内容",
+        "options": {
+          "A": "选项A",
+          "B": "选项B",
+          "C": "选项C",
+          "D": "选项D"
+        },
+        "answer": "正确选项的字母(A或B或C或D)"
+      }
+    ]
+  }
+  
+  请确保返回格式严格符合上述JSON结构，不要添加任何额外的文字说明。`;
+
+  const url = `${BASE_URL}/v1/chat/completions`;
+  const payload = {
+    model: "gemini-2.5-pro",
+    messages: [
+      {
+        role: "system",
+        content: "你是一位帮助生成测验题的助手。根据PDF文件名推测主题并创建相关问题，但不要在问题中提及文件名或使用猜测性语言。直接以肯定的语气出题。总是输出有效的JSON格式。"
+      },
+      {
+        role: "user",
+        content: prompt
+      }
+    ],
+    temperature: 0.6,
+    max_tokens: 4000,
+    response_format: { type: "json_object" }
+  };
+
+  const headers = {
+    'Accept': 'application/json',
+    'Authorization': `Bearer ${API_KEY}`,
+    'Content-Type': 'application/json'
+  };
+
+  console.log("发送PDF文件名处理请求到:", url);
+  
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: headers,
+      body: JSON.stringify(payload),
+    });
+
+    console.log("API响应状态:", response.status, response.statusText);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API错误响应:", errorText);
+      throw new Error(`调用AI API失败: ${errorText}`);
+    }
+    
+    const data = await response.json();
+    console.log("API响应数据前200字符:", JSON.stringify(data).substring(0, 200));
+    
+    const messageContent = data.choices?.[0]?.message?.content;
+    
+    if (!messageContent || messageContent.trim() === '') {
+      console.log("API返回空内容");
+      throw new Error("AI返回了空内容");
+    }
+    
+    // 尝试解析JSON
+    try {
+      // 检查返回的是不是已经是JSON对象
+      if (typeof messageContent === 'object') {
+        const result = ensureValidQuestions(messageContent);
+        return result;
+      }
+      
+      // 尝试从字符串中提取和解析JSON
+      let jsonContent = messageContent;
+      
+      // 如果包含markdown代码块，提取其中内容
+      const jsonMatch = messageContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+      if (jsonMatch) {
+        jsonContent = jsonMatch[1];
+      }
+      
+      // 解析JSON
+      const parsedData = JSON.parse(jsonContent);
+      return ensureValidQuestions(parsedData);
+    } catch (parseError: any) {
+      console.error("JSON解析错误:", parseError, "原始内容:", messageContent);
+      throw new Error(`解析AI返回的JSON失败: ${parseError.message}`);
+    }
+  } catch (error: any) {
+    console.error("处理PDF文件名失败:", error);
+    throw error;
   }
 }
 
