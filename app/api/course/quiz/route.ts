@@ -95,41 +95,73 @@ export async function POST(request: Request) {
 }
 
 // 获取课程的测验列表
+// 修改GET方法，支持两种查询方式
 export async function GET(request: Request) {
-  try {
-    const { searchParams } = new URL(request.url);
-    const courseId = searchParams.get("courseId");
-    
-    if (!courseId) {
-      return NextResponse.json(
-        { error: "缺少课程ID" },
-        { status: 400 }
-      );
-    }
+  const { searchParams } = new URL(request.url);
+  const courseId = searchParams.get("courseId");
+  const quizId = searchParams.get("quizId");
 
-    const quizzes = await prisma.quiz.findMany({
-      where: {
-        courseId: parseInt(courseId),
-      },
-      include: {
-        questions: {
-          include: {
-            options: true
+  try {
+    // 按 quizId 查询单个问卷
+    if (quizId) {
+      const quiz = await prisma.quiz.findUnique({
+        where: { id: parseInt(quizId) },
+        include: {
+          questions: {
+            include: {
+              options: true
+            }
+          },
+          course: {
+            select: {
+              title: true,
+              courseCode: true
+            }
           }
         }
-      },
-      orderBy: {
-        createdAt: "desc"
+      });
+      
+      if (!quiz) {
+        return NextResponse.json(
+          { error: "问卷不存在" },
+          { status: 404 }
+        );
       }
-    });
+      
+      return NextResponse.json(quiz);
+    }
 
-    return NextResponse.json(quizzes);
+    // 按 courseId 查询课程问卷列表
+    if (courseId) {
+      const quizzes = await prisma.quiz.findMany({
+        where: {
+          courseId: parseInt(courseId)
+        },
+        include: {
+          questions: {
+            include: {
+              options: true
+            }
+          }
+        },
+        orderBy: {
+          createdAt: "desc"
+        }
+      });
+      
+      return NextResponse.json(quizzes);
+    }
+
+    return NextResponse.json(
+      { error: "缺少课程ID或问卷ID" },
+      { status: 400 }
+    );
     
   } catch (error: any) {
-    console.error("获取测验列表失败:", error);
+    console.error("获取问卷失败:", error);
     return NextResponse.json(
-      { error: "获取测验列表失败", details: error.message },
+      { error: "获取问卷失败", details: error.message },
       { status: 500 }
     );
   }
-} 
+}

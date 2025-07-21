@@ -46,6 +46,78 @@ export default function AudiencePage() {
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [settingsMessage, setSettingsMessage] = useState("");
+  const [notifiedQuizzes, setNotifiedQuizzes] = useState<number[]>([]);
+  const [newQuizAlert, setNewQuizAlert] = useState<{
+  show: boolean;
+  quiz?: { id: number; title: string; courseId: number };
+}>({ show: false });
+
+// 添加检查新问卷的函数
+const checkNewQuizzes = async () => {
+  // 添加防御性检查
+  if (!currentUser?.id || courses.length === 0) {
+    console.warn('检查中止：缺少用户ID或课程数据', {
+      userId: currentUser?.id,
+      courseCount: courses.length
+    });
+    return;
+  }
+
+  try {
+    const params = new URLSearchParams({
+      courseIds: courses.map(c => c.id).join(','),
+      userId: currentUser.id.toString() // 确保是字符串
+    });
+
+    const res = await fetch(`/api/quiz/recent?${params}`);
+    
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || `HTTP ${res.status}`);
+    }
+
+    const quizzes = await res.json();
+    const lastCheck = localStorage.getItem('lastQuizCheck') || '0';
+    
+    const unseenQuiz = quizzes.find((q: any) => 
+      new Date(q.createdAt).getTime() > parseInt(lastCheck)
+    );
+
+    if (unseenQuiz) {
+      setNewQuizAlert({
+        show: true,
+        quiz: {
+          id: unseenQuiz.id,
+          title: unseenQuiz.title,
+          courseId: unseenQuiz.courseId
+        }
+      });
+    }
+  } catch (error) {
+    console.error('检查失败:', error);
+    // 友好错误提示
+    setMessage('检查新问卷失败: ' + (error instanceof Error ? error.message : String(error)));
+    setTimeout(() => setMessage(''), 3000);
+  }
+};
+
+useEffect(() => {
+  // 仅在课程界面且用户已登录时检查
+  if (activeTab === "courses" && currentUser?.id && courses.length > 0) {
+    checkNewQuizzes()
+    const timer = setInterval(checkNewQuizzes, 5 * 60 * 1000)
+    return () => clearInterval(timer)
+  }
+}, [activeTab, currentUser?.id, courses]) // 关键依赖项
+
+useEffect(() => {
+  console.log('【DEBUG】当前状态:', {
+    activeTab,
+    userId: currentUser?.id,
+    courseCount: courses.length,
+    lastCheck: localStorage.getItem('lastQuizCheck')
+  })
+}, [activeTab, currentUser, courses])
 
   useEffect(() => {
     // 检查本地存储中是否有用户信息
@@ -555,6 +627,35 @@ const handleUpdatePassword = async () => {
           </div>
         </div>
       )}
+
+      {/* 新问卷提醒 */}
+      {activeTab === "courses" && newQuizAlert.show && (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg animate-pop-in">
+      <h3 className="text-xl font-bold mb-2">📢 新问卷通知</h3>
+      <p>{newQuizAlert.quiz?.title}</p>
+      <div className="flex gap-3 mt-4">
+        <button 
+          onClick={() => setNewQuizAlert({...newQuizAlert, show: false})}
+          className="flex-1 py-2 border rounded"
+        >
+          稍后
+        </button>
+      <button
+  onClick={() => {
+    if (newQuizAlert.quiz) {
+      router.push(`/audience/quiz/${newQuizAlert.quiz.courseId}?quizId=${newQuizAlert.quiz.id}`);
+      setNewQuizAlert({ show: false });
+    }
+  }}
+  className="flex-1 py-2 bg-blue-500 text-white rounded"
+>
+  查看
+</button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 } 
