@@ -12,22 +12,7 @@ export async function POST(request: NextRequest) {
     const { content, filename, fileType } = body;
     
     if (!content) {
-      // 如果没有提供内容，返回默认问题
-      const defaultResult = {
-        questions: [
-          {
-            question: "没有提供有效的内容，以下哪项是正确的？",
-            options: {
-              "A": "内容为空",
-              "B": "请提供有效的文本内容以生成问题",
-              "C": "系统无法识别所提供的内容",
-              "D": "以上都是"
-            },
-            answer: "D"
-          }
-        ]
-      };
-      return NextResponse.json(defaultResult);
+      throw new Error("没有提供有效的内容");
     }
     
     // 简单检查内容是否包含HTML标签，如果包含，进行清理
@@ -69,29 +54,17 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(result);
       } catch (secondError: any) {
         console.error("直接调用API也失败:", secondError);
-        // 两种方法都失败，返回基于内容生成的简单问题
-        console.log("所有API调用失败，返回默认问题");
-        return NextResponse.json(generateDefaultQuestions(truncatedContent, filename));
+        // 两种方法都失败，直接抛出错误
+        throw new Error("所有API调用失败，无法生成测验题目");
       }
     }
 
   } catch (error: any) {
     console.error("生成测验失败:", error);
-    // 出现任何错误，返回默认问题
+    // 出现任何错误，直接返回错误信息
     return NextResponse.json({
-      questions: [
-        {
-          question: "系统在生成问题时遇到了错误，以下哪项是可能的原因？",
-          options: {
-            "A": "所提供的内容格式不正确",
-            "B": "AI生成服务暂时不可用",
-            "C": "内容长度不足以生成有意义的问题",
-            "D": "以上都有可能"
-          },
-          answer: "D"
-        }
-      ]
-    });
+      error: error.message || "生成测验题目时出现未知错误"
+    }, { status: 500 });
   }
 }
 
@@ -197,7 +170,7 @@ async function callOpenAIFormat(content: string, filename?: string, fileType?: s
     try {
       // 检查返回的是不是已经是JSON对象
       if (typeof messageContent === 'object') {
-        // 验证结构并修复缺失的问题
+        // 验证结构
         const result = ensureValidQuestions(messageContent);
         return result;
       }
@@ -214,7 +187,7 @@ async function callOpenAIFormat(content: string, filename?: string, fileType?: s
       // 解析JSON
       const parsedData = JSON.parse(jsonContent);
       
-      // 验证并修复格式
+      // 验证结构
       const result = ensureValidQuestions(parsedData);
       return result;
     } catch (parseError: any) {
@@ -223,12 +196,11 @@ async function callOpenAIFormat(content: string, filename?: string, fileType?: s
     }
   } catch (error: any) {
     console.error("调用API失败:", error);
-    // 返回默认问题
-    return generateDefaultQuestions(content, filename);
+    throw error; // 直接抛出错误，不再生成默认问题
   }
 }
 
-// 确保结果包含有效的问题数组
+// 确保结果包含有效的问题数组，但不添加默认问题
 function ensureValidQuestions(data: any) {
   // 确保结果有questions字段
   if (!data.questions) {
@@ -240,67 +212,12 @@ function ensureValidQuestions(data: any) {
     data.questions = [];
   }
   
-  // 如果问题数组为空，添加默认问题
+  // 如果问题数组为空，抛出错误
   if (data.questions.length === 0) {
-    // 根据内容生成一个简单的默认问题
-    const defaultQuestion = {
-      question: "以下关于所提供内容的描述，哪一项是正确的？",
-      options: {
-        "A": "所提供的内容过于简短，无法生成有效问题",
-        "B": "所提供的内容格式不适合生成测验题目",
-        "C": "所提供的内容可能需要更多上下文来理解",
-        "D": "所提供的内容可能是文件名或其他非教学材料"
-      },
-      answer: "C"
-    };
-    
-    data.questions.push(defaultQuestion);
+    throw new Error("AI未能生成有效的测验题目");
   }
   
   return data;
-}
-
-// 生成默认问题
-function generateDefaultQuestions(content: string, filename?: string) {
-  // 从内容中提取一些关键词（简单实现）
-  const words = content
-    .replace(/[^\w\s\u4e00-\u9fa5]/g, ' ')  // 保留中文字符和字母数字
-    .split(/\s+/)
-    .filter(word => word.length >= 2);  // 只保留长度至少为2的词
-  
-  const keywords = [...new Set(words)].slice(0, 5);  // 去重并最多取5个
-  
-  // 创建默认问题
-  const questions = [
-    {
-      question: filename 
-        ? `基于文件"${filename}"的内容，以下哪个选项最可能是本文档的主题？`
-        : "基于文件内容，以下哪个选项最可能是本文档的主题？",
-      options: {
-        "A": keywords[0] ? `与"${keywords[0]}"相关的主题` : "文件未包含足够信息",
-        "B": keywords[1] ? `关于"${keywords[1]}"的讨论` : "无法确定具体主题",
-        "C": keywords[2] ? `"${keywords[2]}"的介绍或分析` : "需要更多上下文信息",
-        "D": "文件可能包含不完整或不相关的内容"
-      },
-      answer: "D"
-    }
-  ];
-  
-  // 如果有足够的关键词，添加第二个问题
-  if (keywords.length >= 3) {
-    questions.push({
-      question: "以下哪个术语或概念在文档中出现？",
-      options: {
-        "A": keywords[0] || "无法确定",
-        "B": keywords[1] || "无法确定",
-        "C": keywords[2] || "无法确定",
-        "D": "以上都出现"
-      },
-      answer: "D"
-    });
-  }
-  
-  return { questions };
 }
 
 // 直接API调用方式
@@ -415,7 +332,7 @@ async function callDirectAPI(content: string, filename?: string, fileType?: stri
       
       const result = JSON.parse(jsonContent);
       
-      // 验证并修复格式
+      // 验证结构
       return ensureValidQuestions(result);
     } catch (parseError) {
       console.error("解析返回数据失败:", parseError, "原始内容:", messageContent);
@@ -442,17 +359,17 @@ async function callDirectAPI(content: string, filename?: string, fileType?: stri
         if (questions.length > 0) {
           return ensureValidQuestions({ questions });
         }
+        
+        // 如果没有提取到问题，抛出错误
+        throw new Error("无法从AI响应中提取有效问题");
       } catch (extractError) {
         console.error("无法从文本提取问题:", extractError);
+        throw new Error("无法从AI响应中提取有效问题");
       }
-      
-      // 如果提取失败，返回默认问题
-      return generateDefaultQuestions(content, filename);
     }
   } catch (error) {
     console.error("直接API调用失败:", error);
-    // 返回默认问题
-    return generateDefaultQuestions(content, filename);
+    throw error; // 直接抛出错误，不再生成默认问题
   }
 }
 
