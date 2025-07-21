@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 // 修改API URL和调用参数
-const BASE_URL = "https://token.geminiapi.top";
-const API_KEY = "sk-gNbGnpLdWo1tETWdUwCJcRUdwQS6AXHUSjDTvafYGkgW4Ik9";
+const BASE_URL = "http://token.geminiapi.top";
+const API_KEY = "sk-Coo5PgGRWbyc6M5OSIT53nRWcA7xNc25DkyP5cm6Gy5X5zlm";
 const MAX_CONTENT_LENGTH = 20000; // 增加内容长度限制
 
 export async function POST(request: NextRequest) {
