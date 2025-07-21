@@ -72,6 +72,11 @@ export default function SpeakerPage() {
 
   const [quizStatistics, setQuizStatistics] = useState<QuizStatistics[]>([]);
 
+  const [showStatisticsNotification, setShowStatisticsNotification] = useState(false);
+  const [statisticsNotificationTimeout, setStatisticsNotificationTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [currentQuizId, setCurrentQuizId] = useState<number | null>(null);
+  const [currentQuizTitle, setCurrentQuizTitle] = useState<string>("");
+
   useEffect(() => {
     // 检查本地存储中是否有用户信息
     const savedUser = localStorage.getItem('currentUser');
@@ -300,6 +305,52 @@ export default function SpeakerPage() {
         });
     }
   }, [activeTab, selectedCourse]);
+
+  const checkNewStatisticsNotification = async () => {
+    if (!currentUser) return;
+
+    const res = await fetch(`/api/quiz/statistics/notify?userId=${currentUser.id}`);
+    const data = await res.json();
+
+    if (data.hasNewStatistics && data.quizId) {
+      // 检查本地是否已关闭过该 quiz 的通知
+      if (!localStorage.getItem(`statisticsNotificationClosed_${data.quizId}`)) {
+        setShowStatisticsNotification(true);
+        setCurrentQuizId(data.quizId);
+        setCurrentQuizTitle(data.quizTitle);
+
+        // 1分钟后自动关闭
+        if (!statisticsNotificationTimeout) {
+          const timeout = setTimeout(() => {
+            setShowStatisticsNotification(false);
+            if (data.quizId) {
+              localStorage.setItem(`statisticsNotificationClosed_${data.quizId}`, "1");
+            }
+          }, 60000);
+          setStatisticsNotificationTimeout(timeout);
+        }
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "statistics" && currentUser) {
+      checkNewStatisticsNotification();
+      const interval = setInterval(checkNewStatisticsNotification, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, currentUser]);
+
+  const handleCloseStatisticsNotification = () => {
+    setShowStatisticsNotification(false);
+    if (currentQuizId) {
+      localStorage.setItem(`statisticsNotificationClosed_${currentQuizId}`, "1");
+    }
+    if (statisticsNotificationTimeout) {
+      clearTimeout(statisticsNotificationTimeout);
+      setStatisticsNotificationTimeout(null);
+    }
+  };
 
   if (!currentUser) {
     return <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800">加载中...</div>;
@@ -577,6 +628,12 @@ export default function SpeakerPage() {
           </div>
         )}
       </div>
+      {showStatisticsNotification && (
+        <div className="fixed top-8 left-1/2 transform -translate-x-1/2 z-50 bg-yellow-100 border border-yellow-400 text-yellow-800 px-6 py-3 rounded shadow-lg flex items-center space-x-4">
+          <span>有新的问卷统计消息【{currentQuizTitle}】，请及时查看！</span>
+          <button onClick={handleCloseStatisticsNotification} className="ml-4 text-yellow-700 hover:underline">关闭</button>
+        </div>
+      )}
     </div>
   );
 } 
