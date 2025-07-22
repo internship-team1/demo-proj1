@@ -44,6 +44,30 @@ interface QuizStatistics {
   }[];
 }
 
+//问卷留言
+interface QuizComment {
+  id: number;
+  quizId: number;
+  content: string;
+  createdAt: string;
+  user: {
+    username: string;
+  };
+}
+
+//课程留言
+interface CourseComment {
+  id: number;
+  content: string;
+  createdAt: string;
+  courseId: number;
+  user: {
+    id: number;
+    username: string;
+    role?: string; 
+  };
+}
+
 export default function SpeakerPage() {
   const [activeTab, setActiveTab] = useState<"courses" | "statistics" | "settings">("courses");
   const router = useRouter();
@@ -83,6 +107,40 @@ export default function SpeakerPage() {
   const [currentQuizId, setCurrentQuizId] = useState<number | null>(null);
   const [currentQuizTitle, setCurrentQuizTitle] = useState<string>("");
 
+  //添加统计页面组件状态
+    const [quizComments, setQuizComments] = useState<QuizComment[]>([]);
+    const [courseComments, setCourseComments] = useState<CourseComment[]>([]);
+    const [activeCommentTab, setActiveCommentTab] = useState<"course" | "quiz">("course");
+  
+    // 当选择的课程变化时加载留言
+  useEffect(() => {
+    fetchCourseComments();
+  }, [selectedCourse]);
+  
+  // 当选择测验时加载测验留言
+  useEffect(() => {
+    if (selectedQuiz && activeCommentTab === "quiz") {
+      fetchQuizComments();
+    }
+  }, [selectedQuiz, activeCommentTab]);
+  
+  // 当切换留言选项卡时
+  useEffect(() => {
+    if (activeCommentTab === "quiz" && selectedQuiz) {
+      fetchQuizComments();
+    } else if (activeCommentTab === "course") {
+      fetchCourseComments();
+    }
+  }, [activeCommentTab]);
+  
+  // 自动滚动到底部
+  useEffect(() => {
+    const container = document.querySelector(".comments-container");
+    if (container && courseComments.length > 0) {
+      container.scrollTop = container.scrollHeight;
+    }
+  }, [courseComments]);
+
   useEffect(() => {
     // 检查本地存储中是否有用户信息
     const savedUser = localStorage.getItem('currentUser');
@@ -108,6 +166,36 @@ export default function SpeakerPage() {
       router.push("/");
     }
   }, [router]);
+
+  //添加获取课程留言函数
+  const fetchCourseComments = async () => {
+  if (!selectedCourse) return;
+  
+  try {
+    const res = await fetch(`/api/comments?courseId=${selectedCourse}`);
+    if (!res.ok) throw new Error("获取留言失败");
+    
+    const data = await res.json();
+    setCourseComments(data);
+  } catch (error) {
+    console.error("获取课程留言失败:", error);
+    setCourseComments([]);
+  }
+};
+
+//添加获取问卷留言函数
+const fetchQuizComments = async () => {
+  if (!selectedQuiz) return;
+  
+  try {
+    const res = await fetch(`/api/quiz/comments?quizId=${selectedQuiz}`);
+    const data = await res.json();
+    setQuizComments(data);
+  } catch (error) {
+    console.error("获取测验留言失败:", error);
+    setQuizComments([]);
+  }
+};
   
   const fetchMySpeakerCourses = async (userId: number) => {
     try {
@@ -578,34 +666,82 @@ export default function SpeakerPage() {
                   )}
                 </div>
                 
-                {/* 右侧课程留言区 */}
-                <div className="w-full md:w-1/3">
-                  <div className="mb-4">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-medium text-gray-800">课程留言</h3>
-                    </div>
-                    
-                    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full">
-                      {messages.filter(message => message.courseId === selectedCourse).length > 0 ? (
-                        <div className="divide-y divide-gray-200 max-h-[600px] overflow-y-auto">
-                          {messages.filter(message => message.courseId === selectedCourse).map(message => (
-                            <div key={message.id} className="p-4">
-                              <div className="flex justify-between items-center mb-2">
-                                <span className="font-medium">{message.userName}</span>
-                                <span className="text-sm text-gray-500">{message.timestamp}</span>
-                              </div>
-                              <p className="text-gray-700">{message.content}</p>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center p-8">
-                          <p className="text-gray-600">此课程尚无留言</p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                {/* 右侧留言区域 */}
+<div className="w-full md:w-1/3">
+  <div className="mb-4">
+    <div className="flex items-center justify-between mb-4">
+      <h3 className="text-xl font-medium text-gray-800">留言</h3>
+    </div>
+    
+    <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden h-full">
+      {/* 留言选项卡 */}
+      <div className="flex border-b border-gray-200">
+        <button
+          className={`flex-1 py-2 text-sm font-medium ${
+            activeCommentTab === "course" 
+              ? 'text-blue-600 border-b-2 border-blue-600' 
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+          onClick={() => setActiveCommentTab("course")}
+        >
+          课程留言
+        </button>
+        <button
+          className={`flex-1 py-2 text-sm font-medium ${
+            activeCommentTab === "quiz" 
+              ? 'text-blue-600 border-b-2 border-blue-600' 
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+          onClick={() => setActiveCommentTab("quiz")}
+          disabled={!selectedQuiz}
+        >
+          测验留言
+        </button>
+      </div>
+      
+      {/* 留言内容区域 */}
+      <div className="divide-y divide-gray-200 max-h-[400px] overflow-y-auto p-4">
+        {activeCommentTab === "course" ? (
+          courseComments.length > 0 ? (
+            courseComments.map(comment => (
+              <div key={comment.id} className="py-3">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="font-medium">{comment.user.username}</span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(comment.createdAt).toLocaleString()}
+                  </span>
                 </div>
+                <p className="text-gray-700 text-sm">{comment.content}</p>
+              </div>
+            ))
+          ) : (
+            <div className="text-center p-8">
+              <p className="text-gray-600">此课程尚无留言</p>
+            </div>
+          )
+        ) : (
+          quizComments.length > 0 ? (
+            quizComments.map(comment => (
+              <div key={comment.id} className="py-3">
+                <div className="flex justify-between items-start mb-1">
+                  <span className="font-medium">{comment.user.username}</span>
+                  <span className="text-xs text-gray-500">
+                    {new Date(comment.createdAt).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-gray-700 text-sm">{comment.content}</p>
+              </div>
+            ))
+          ) : (
+            <div className="text-center p-8">
+              <p className="text-gray-600">此测验尚无留言</p>
+            </div>
+          )
+        )}
+      </div>
+    </div>
+  </div>
+</div>
               </div>
             ) : (
               <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
