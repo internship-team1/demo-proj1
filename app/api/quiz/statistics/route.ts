@@ -70,17 +70,35 @@ export async function GET(req: NextRequest) {
           }
         });
       }
-      
+      // 统计每个选项被选人数
+      const options = await Promise.all(
+        q.options.map(async (opt: any) => {
+          const count = await prisma.answer.count({
+            where: {
+              questionId: q.id,
+              optionId: opt.id
+            }
+          });
+          return {
+            text: opt.content,
+            count
+          };
+        })
+      );
       // 累计错误数
       totalErrors += (total - correct);
       // 累计答题数
       totalResponses += total;
       
+      // 计算正确率
+      const correctRate = total > 0 ? Math.round((correct / total) * 10000) / 100 : 0;
       questions.push({
         questionId: q.id,
         questionText: q.content,
         total,
-        correct
+        correct,
+        options,
+        correctRate
       });
     }
     
