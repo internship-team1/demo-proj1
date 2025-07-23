@@ -131,6 +131,24 @@ export default function OrganizerPage() {
   const [courseComments, setCourseComments] = useState<CourseComment[]>([]);
   const [activeCommentTab, setActiveCommentTab] = useState<"course" | "quiz">("course");
 
+  //添加课程组件
+  interface CourseExtraInfo {
+  organizer: string;
+  speaker: string | null;
+  members: number;
+}
+
+const [extraInfo, setExtraInfo] = useState<Record<string, CourseExtraInfo>>({});
+// 获取课程额外信息
+  useEffect(() => {
+  fetch('/api/courses/extra-info')
+    .then(res => res.json())
+    .then(data => {
+      console.log("API返回数据:", data); // 检查数据是否正常
+      setExtraInfo(data);
+    });
+}, []);
+
   // 当选择的课程变化时加载留言
 useEffect(() => {
   fetchCourseComments();
@@ -1039,6 +1057,25 @@ const fetchQuizComments = async () => {
                     <div key={course.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
                       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
                       <h3 className="text-xl font-medium mb-2 text-gray-800">{course.title}</h3>
+                      
+                      {/* 课程基础信息（始终显示） */}
+<div className="flex flex-wrap gap-2 text-sm text-gray-500 mb-3">
+  <span className="bg-gray-100 px-2 py-1 rounded-md">
+    组织者: {extraInfo[course.id]?.organizer || '加载中...'}
+  </span>
+  
+  {extraInfo[course.id]?.speaker && (
+    <span className="bg-gray-100 px-2 py-1 rounded-md">
+      演讲者: {extraInfo[course.id].speaker}
+    </span>
+  )}
+  
+  <span className="bg-gray-100 px-2 py-1 rounded-md">
+    成员数: {extraInfo[course.id]?.members ?? 0}
+  </span>
+</div>
+                      
+
                       <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
                         <span className="font-medium">课程码:</span>
                         <span className="bg-gray-100 px-3 py-1 rounded-md font-mono">{course.courseCode}</span>

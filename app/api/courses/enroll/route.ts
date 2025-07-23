@@ -9,6 +9,7 @@ type EnrollmentData = {
   userId: number
 }
 
+// 修改后的 GET 方法（仅调整查询部分）
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -21,7 +22,7 @@ export async function GET(request: Request) {
       )
     }
 
-    // 查询用户已加入的课程
+    // 修改后的查询（包含演讲者和人数统计）
     const enrollments = await prisma.courseMember.findMany({
       where: { 
         userId: parseInt(userId) 
@@ -29,9 +30,9 @@ export async function GET(request: Request) {
       include: {
         course: {
           include: {
-            organizer: {
-              select: { username: true }
-            }
+            organizer: { select: { username: true } },
+            speaker: { select: { username: true } }, // 新增演讲者查询
+            _count: { select: { members: true } }    // 新增人数统计
           }
         }
       }
@@ -43,10 +44,11 @@ export async function GET(request: Request) {
         title: e.course.title,
         courseCode: e.course.courseCode,
         organizer: e.course.organizer.username,
+        speaker: e.course.speaker?.username || null, // 新增演讲者字段
+        audienceCount: e.course._count.members,  // 计算观众数（减去组织者）
         joinedAt: e.joinedAt
       }))
     })
-
   } catch (error) {
     console.error('[GET_ENROLLMENTS_ERROR]', error)
     return NextResponse.json(

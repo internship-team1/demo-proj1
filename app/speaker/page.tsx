@@ -8,6 +8,10 @@ interface Course {
   title: string;
   organizer: string;
   courseCode: string;
+  // 新增字段
+  speakerName?: string;       // 演讲者姓名（可选）
+  memberCount?: number;       // 成员数
+  isLoadingDetails?: boolean; // 加载状态
 }
 
 interface SurveyResult {
@@ -200,18 +204,18 @@ const fetchQuizComments = async () => {
 };
   
   const fetchMySpeakerCourses = async (userId: number) => {
-    try {
-      // 获取当前用户担任演讲者的课程
-      const response = await fetch(`/api/course?speakerId=${userId}`);
-      if (response.ok) {
-        const coursesData = await response.json();
-        setCourses(coursesData);
-      }
-    } catch (error) {
-      console.error("获取课程失败:", error);
-      setMessage("获取课程列表失败");
-    }
-  };
+  try {
+    // 获取课程基础信息+详情
+    const response = await fetch(`/api/courses/with-details?speakerId=${userId}`);
+    if (!response.ok) throw new Error("获取课程列表失败");
+    
+    const coursesData = await response.json();
+    setCourses(coursesData);
+  } catch (error) {
+    console.error("获取课程失败:", error);
+    setMessage("获取课程列表失败");
+  }
+};
 
   const handleDeleteCourse = (id: number) => {
     setCourses(courses.filter(course => course.id !== id));
@@ -519,44 +523,66 @@ const fetchQuizComments = async () => {
       {/* 主内容区 */}
       <div className="flex-1 p-8 bg-white overflow-y-auto m-4 rounded-lg shadow-sm border border-gray-200">
         {/* 课程页面 */}
-        {activeTab === "courses" && (
-          <div>
-            <div className="flex justify-between items-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-800">我的课程</h1>
+{activeTab === "courses" && (
+  <div>
+    <div className="flex justify-between items-center mb-6">
+      <h1 className="text-2xl font-bold text-gray-800">我的课程</h1>
+    </div>
+    
+    {message && (
+      <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-md">
+        {message}
+      </div>
+    )}
+    
+    {courses.length === 0 ? (
+      <p className="text-gray-500">您还没有任何课程</p>
+    ) : (
+      <div className="grid gap-6 md:grid-cols-2">
+        {courses.map(course => (
+          <div key={course.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+            {/* 顶部装饰条 */}
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
+            
+            {/* 课程标题 */}
+            <h3 className="text-xl font-medium mb-2 text-gray-800">{course.title}</h3>
+            
+            {/* 课程基础信息（始终显示） */}
+            <div className="flex flex-wrap gap-2 text-sm text-gray-500 mb-3">
+              <span className="bg-gray-100 px-2 py-1 rounded-md">
+                组织者: {course.organizer}
+              </span>
+              {course.speakerName && (
+                <span className="bg-gray-100 px-2 py-1 rounded-md">
+                  演讲者: {course.speakerName}
+                </span>
+              )}
+              <span className="bg-gray-100 px-2 py-1 rounded-md">
+                成员数: {course.memberCount || 0}
+              </span>
             </div>
             
-            {message && (
-              <div className="mb-4 p-3 bg-blue-50 text-blue-800 rounded-md">
-                {message}
-              </div>
-            )}
-            
-            {courses.length === 0 ? (
-              <p className="text-gray-500">您还没有任何课程</p>
-            ) : (
-              <div className="grid gap-6 md:grid-cols-2">
-                {courses.map(course => (
-                  <div key={course.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
-                    <h3 className="text-xl font-medium mb-2 text-gray-800">{course.title}</h3>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-                      <span className="font-medium">课程码:</span>
-                      <span className="bg-gray-100 px-3 py-1 rounded-md font-mono">{course.courseCode}</span>
-                    </div>
-                    <div className="grid grid-cols-1 gap-3">
-                      <button 
-                        className="w-full py-2 px-3 bg-transparent hover:bg-gray-100 text-red-600 rounded-md transition-colors border border-gray-300"
-                        onClick={() => handleExitCourse(course.id)}
-                      >
-                        退出课程
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* 课程码（保持原有样式） */}
+            <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+              <span className="font-medium">课程码:</span>
+              <span className="bg-gray-100 px-3 py-1 rounded-md font-mono">{course.courseCode}</span>
+            </div>
+
+            {/* 操作按钮（保持原有样式） */}
+            <div className="grid grid-cols-1 gap-3">
+              <button 
+                className="w-full py-2 px-3 bg-transparent hover:bg-gray-100 text-red-600 rounded-md transition-colors border border-gray-300"
+                onClick={() => handleExitCourse(course.id)}
+              >
+                退出课程
+              </button>
+            </div>
           </div>
-        )}
+        ))}
+      </div>
+    )}
+  </div>
+)}
         
         {/* 统计页面 */}
         {activeTab === "statistics" && (

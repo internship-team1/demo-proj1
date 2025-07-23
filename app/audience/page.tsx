@@ -7,8 +7,12 @@ import { useRouter } from "next/navigation";
 interface Course {
   id: number;
   title: string;
-  organizer: string;
   courseCode: string;
+  organizer: string;  // 保持原有字段
+  organizerName?: string; // 新增字段
+  speaker?: string;   // 新增字段
+  audienceCount?: number; // 新增字段
+  joinedAt?: string; 
 }
 
 interface Comment {
@@ -449,44 +453,63 @@ const handleUpdatePassword = async () => {
             </div>
             
             {/* 课程列表 */}
-            {courses.length > 0 ? (
-              <div className="grid gap-6 md:grid-cols-2">
-                {courses.map(course => (
-                  <div key={course.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
-                    <h3 className="text-xl font-medium mb-2 text-gray-800">{course.title}</h3>
-                    <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-                      <span className="font-medium">课程码:</span>
-                      <span className="bg-gray-100 px-3 py-1 rounded-md font-mono">{course.courseCode}</span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button 
-                        className="py-2 px-3 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300 text-sm"
-                        onClick={() => viewQuiz(course.id)}
-                      >
-                        问卷
-                      </button>
-                      <button 
-                        className="py-2 px-3 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300 text-sm"
-                        onClick={() => handleComment(course.id)}
-                      >
-                        留言
-                      </button>
-                      <button 
-                        className="py-2 px-3 bg-transparent hover:bg-gray-100 text-red-600 rounded-md transition-colors border border-gray-300 text-sm"
-                        onClick={() => handleLeaveCourse(course.id)}
-                      >
-                        退出
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
-                <p className="text-gray-600">您还没有加入任何课程</p>
-              </div>
-            )}
+{courses.length > 0 ? (
+  <div className="grid gap-6 md:grid-cols-2">
+    {courses.map(course => (
+      <div key={course.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
+        <h3 className="text-xl font-medium mb-2 text-gray-800">{course.title}</h3>
+        
+        {/* 新增的信息展示区 - 保持原有风格 */}
+        <div className="flex flex-wrap gap-2 text-sm text-gray-500 mb-3">
+          <span className="bg-gray-100 px-2 py-1 rounded-md">
+            组织者: {course.organizer}
+          </span>
+          {course.speaker && (
+            <span className="bg-gray-100 px-2 py-1 rounded-md">
+              演讲者: {course.speaker}
+            </span>
+          )}
+          <span className="bg-gray-100 px-2 py-1 rounded-md">
+            成员数: {course.audienceCount}人
+          </span>
+        </div>
+
+        {/* 原有的课程码展示 */}
+        <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
+          <span className="font-medium">课程码:</span>
+          <span className="bg-gray-100 px-3 py-1 rounded-md font-mono">{course.courseCode}</span>
+        </div>
+
+        {/* 原有的操作按钮保持不变 */}
+        <div className="grid grid-cols-3 gap-2">
+          <button 
+            className="py-2 px-3 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300 text-sm"
+            onClick={() => viewQuiz(course.id)}
+          >
+            问卷
+          </button>
+          <button 
+            className="py-2 px-3 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300 text-sm"
+            onClick={() => handleComment(course.id)}
+          >
+            留言
+          </button>
+          <button 
+            className="py-2 px-3 bg-transparent hover:bg-gray-100 text-red-600 rounded-md transition-colors border border-gray-300 text-sm"
+            onClick={() => handleLeaveCourse(course.id)}
+          >
+            退出
+          </button>
+        </div>
+      </div>
+    ))}
+  </div>
+) : (
+  <div className="text-center p-8 bg-gray-50 rounded-lg border border-gray-200">
+    <p className="text-gray-600">您还没有加入任何课程</p>
+  </div>
+)}
           </div>
         ) : (
           // 设置选项卡内容
