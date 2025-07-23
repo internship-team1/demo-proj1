@@ -35,6 +35,14 @@ interface Comment {
   };
 }
 
+interface Ranking {
+  userId: number;
+  username: string;
+  correctCount: number;
+  percentage: number;
+  rank: number;
+}
+
 export default function CourseQuizPage() {
   const router = useRouter();
   const params = useParams();
@@ -56,6 +64,9 @@ export default function CourseQuizPage() {
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [courseInfo, setCourseInfo] = useState<{title: string, courseCode: string} | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [quizEnded, setQuizEnded] = useState(false);
+  const [rankings, setRankings] = useState<Ranking[]>([]);
+  const [userRanking, setUserRanking] = useState<Ranking | null>(null);
 
   useEffect(() => {
     // 检查用户登录状态
@@ -186,11 +197,18 @@ export default function CourseQuizPage() {
       setTimeRemaining(prev => {
         if (prev === null || prev <= 1) {
           clearInterval(timer);
-          // 时间到，启用留言功能
+          // 时间到，标记问卷结束
+          setQuizEnded(true);
           setCanComment(true);
           if (quizCompleted) {
             setShowComments(true);
-            if (activeQuiz) fetchComments(activeQuiz.id);
+            if (activeQuiz) {
+              fetchComments(activeQuiz.id);
+              // 问卷结束时，获取成绩和排名
+              if (currentUser) {
+                fetchScoreAndRanking(activeQuiz.id, currentUser.id);
+              }
+            }
           }
           return 0;
         }
@@ -199,7 +217,31 @@ export default function CourseQuizPage() {
     }, 1000);
     
     return () => clearInterval(timer);
-  }, [timeRemaining, quizCompleted, activeQuiz]);
+  }, [timeRemaining, quizCompleted, activeQuiz, currentUser]);
+
+  // 新增：获取分数和排名
+  const fetchScoreAndRanking = async (quizId: number, userId: number) => {
+    try {
+      // 获取答案和分数
+      const scoreResponse = await fetch(`/api/quiz/answers?quizId=${quizId}&userId=${userId}`);
+      if (scoreResponse.ok) {
+        const scoreData = await scoreResponse.json();
+        if (scoreData.success) {
+          setScore(scoreData.score);
+        }
+      }
+      
+      // 获取排名数据
+      const rankingResponse = await fetch(`/api/quiz/ranking?quizId=${quizId}&userId=${userId}`);
+      if (rankingResponse.ok) {
+        const rankingData = await rankingResponse.json();
+        setRankings(rankingData.ranking || []);
+        setUserRanking(rankingData.userRanking);
+      }
+    } catch (error) {
+      console.error("获取分数和排名失败:", error);
+    }
+  };
 
   // 格式化时间
   const formatTime = (seconds: number): string => {
@@ -280,36 +322,29 @@ export default function CourseQuizPage() {
         throw new Error(errorData.error || "提交答案失败");
       }
       
-      const result = await response.json();
-      
-      // 更新分数
-      if (result.success && result.score) {
-        setScore(result.score);
-      } else {
-        // 如果API没有返回分数，手动计算
-        calculateScoreLocally();
-      }
-      
+      // 设置状态为已完成但不显示分数
       setQuizCompleted(true);
-      setShowComments(true);
       setHasSubmitted(true);
       
-      // 检查是否可以评论
+      // 检查测验是否已结束
       const now = new Date();
       const endTime = activeQuiz.endTime ? new Date(activeQuiz.endTime) : null;
-      if (endTime && now >= endTime) {
-        setCanComment(true);
-      }
       
-      // 加载评论
-      fetchComments(activeQuiz.id);
+      if (endTime && now >= endTime) {
+        // 如果已经结束，则获取成绩和排名
+        setQuizEnded(true);
+        setCanComment(true);
+        setShowComments(true);
+        fetchComments(activeQuiz.id);
+        fetchScoreAndRanking(activeQuiz.id, currentUser.id);
+      } else {
+        // 显示等待消息
+        setShowResults(true);
+      }
       
     } catch (error) {
       console.error("提交答案失败:", error);
-      // 如果API调用失败，使用本地计算的分数
-      calculateScoreLocally();
       setQuizCompleted(true);
-      setShowComments(true);
       setHasSubmitted(true);
     }
   };
@@ -393,11 +428,9 @@ export default function CourseQuizPage() {
           const data = await response.json();
           
           if (data.success && data.hasSubmitted) {
-            // 用户已提交答案，显示结果
+            // 用户已提交答案
             setActiveQuiz(quiz);
             setSelectedAnswers(data.answers);
-            setScore(data.score);
-            setShowResults(true);
             setQuizCompleted(true);
             setHasSubmitted(true);
             
@@ -405,17 +438,20 @@ export default function CourseQuizPage() {
             const now = new Date();
             const endTime = quiz.endTime ? new Date(quiz.endTime) : null;
             
-            if (endTime) {
-              if (now >= endTime) {
-                setCanComment(true);
-                setShowComments(true);
-                fetchComments(quiz.id);
-              } else {
-                // 测验还未结束，设置倒计时
-                const remainingMs = endTime.getTime() - now.getTime();
-                const remainingSecs = Math.max(0, Math.floor(remainingMs / 1000));
-                setTimeRemaining(remainingSecs);
-              }
+            if (endTime && now >= endTime) {
+              // 如果已结束，获取成绩和排名
+              setQuizEnded(true);
+              setShowResults(true);
+              setCanComment(true);
+              setShowComments(true);
+              fetchComments(quiz.id);
+              fetchScoreAndRanking(quiz.id, currentUser.id);
+            } else {
+              // 如果未结束，仅显示等待消息
+              setShowResults(true);
+              const remainingMs = endTime!.getTime() - now.getTime();
+              const remainingSecs = Math.max(0, Math.floor(remainingMs / 1000));
+              setTimeRemaining(remainingSecs);
             }
             return;
           }
@@ -432,6 +468,7 @@ export default function CourseQuizPage() {
     setShowResults(false);
     setQuizCompleted(false);
     setHasSubmitted(false);
+    setQuizEnded(false);
     
     // 计算剩余时间
     if (quiz.endTime) {
@@ -452,23 +489,14 @@ export default function CourseQuizPage() {
     setShowResults(true);
     setQuizCompleted(true);
     setHasSubmitted(true);
-    setCanComment(true); // 已结束的测验可以评论
+    setQuizEnded(true);
+    setCanComment(true);
     setShowComments(true);
     fetchComments(quiz.id);
     
-    // 如果用户已提交答案，获取用户的答案
+    // 如果用户已提交答案，获取用户的答案和排名
     if (currentUser) {
-      fetch(`/api/quiz/answers?quizId=${quiz.id}&userId=${currentUser.id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success && data.hasSubmitted) {
-            setSelectedAnswers(data.answers);
-            setScore(data.score);
-          }
-        })
-        .catch(error => {
-          console.error("获取用户答案失败:", error);
-        });
+      fetchScoreAndRanking(quiz.id, currentUser.id);
     }
   };
 
@@ -511,70 +539,119 @@ export default function CourseQuizPage() {
           
           {showResults || quizCompleted ? (
             <div className="quiz-results">
-              {/* 分数显示 */}
-              {score && (
-                <div className="text-center py-6 mb-8 bg-gray-50 rounded-lg">
-                  <h3 className="text-4xl font-bold mb-2">{score.percentage}%</h3>
-                  <p className="text-gray-600">{score.correct} / {score.total} 正确</p>
-                  <p className="mt-4 text-gray-700">
-                    {score.percentage >= 80 ? "优秀！" : 
-                     score.percentage >= 60 ? "不错！" : 
-                     "继续努力！"}
-                  </p>
-                </div>
-              )}
-              
-              {/* 问题回顾 */}
-              {activeQuiz.questions && activeQuiz.questions.length > 0 && (
-                <div className="mt-8">
-                  <h3 className="text-xl font-semibold mb-4">测验回顾</h3>
-                  
-                  <div className="space-y-6">
-                    {activeQuiz.questions.map((question, idx) => {
-                      const selectedOptionId = selectedAnswers[question.id];
-                      const correctOption = question.options.find(opt => opt.isCorrect);
-                      const isCorrect = selectedOptionId !== undefined && correctOption && selectedOptionId === correctOption.id;
-                      
-                      return (
-                        <div key={question.id} className="pb-4">
-                          <h4 className="font-medium mb-3">{question.content}</h4>
-                          <div className="space-y-2">
-                            {question.options.map(option => (
-                              <div 
-                                key={option.id} 
-                                className={`p-3 rounded-md border ${
-                                  option.isCorrect ? 'border-green-500 bg-green-50' : 
-                                  selectedOptionId === option.id ? 'border-red-500 bg-red-50' : 
-                                  'border-gray-200'
-                                }`}
-                              >
-                                <div className="flex items-center">
-                                  <span className={`inline-block w-6 h-6 rounded-full mr-2 text-center flex items-center justify-center ${
-                                    option.isCorrect ? 'bg-green-500 text-white' : 
-                                    selectedOptionId === option.id ? 'bg-red-500 text-white' : 
-                                    'bg-gray-100 text-gray-700'
-                                  }`}>
-                                    {String.fromCharCode(65 + idx % 26)}
-                                  </span>
-                                  <span className="flex-grow">{option.content}</span>
-                                  {option.isCorrect && (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  )}
-                                  {selectedOptionId === option.id && !option.isCorrect && (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })}
+              {quizEnded ? (
+                <>
+                  {/* 合并分数和排名信息，只显示必要信息 */}
+                  <div className="text-center py-6 mb-4 bg-gray-50 rounded-lg">
+                    {score && userRanking && (
+                      <>
+                        <h3 className="text-5xl font-bold mb-3">{score.percentage}%</h3>
+                        <p className="text-gray-700 text-lg font-medium">
+                          第 {userRanking.rank} 名
+                          {rankings.length > 1 && <span className="text-sm text-gray-500 ml-2">(共 {rankings.length} 人)</span>}
+                        </p>
+                      </>
+                    )}
                   </div>
+                  
+                  {/* 移除排名显示独立区块 */}
+                  
+                  {/* 保留排行榜，但简化显示 */}
+                  {rankings.length > 1 && (
+                    <div className="mb-8">
+                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <table className="min-w-full">
+                          <thead className="bg-gray-50">
+                            <tr>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">排名</th>
+                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
+                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">得分</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {rankings.slice(0, 10).map((rank) => (
+                              <tr key={rank.userId} className={rank.userId === currentUser?.id ? "bg-blue-50" : ""}>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{rank.rank}</td>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
+                                  {rank.username}
+                                  {rank.userId === currentUser?.id && <span className="ml-2 text-blue-500">(我)</span>}
+                                </td>
+                                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{rank.percentage}%</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* 问题回顾 */}
+                  {activeQuiz.questions && activeQuiz.questions.length > 0 && (
+                    <div className="mt-8">
+                      <h3 className="text-xl font-semibold mb-4">测验回顾</h3>
+                      
+                      <div className="space-y-6">
+                        {activeQuiz.questions.map((question, idx) => {
+                          const selectedOptionId = selectedAnswers[question.id];
+                          const correctOption = question.options.find(opt => opt.isCorrect);
+                          const isCorrect = selectedOptionId !== undefined && correctOption && selectedOptionId === correctOption.id;
+                          
+                          return (
+                            <div key={question.id} className="pb-4">
+                              <h4 className="font-medium mb-3">{question.content}</h4>
+                              <div className="space-y-2">
+                                {question.options.map(option => (
+                                  <div 
+                                    key={option.id} 
+                                    className={`p-3 rounded-md border ${
+                                      option.isCorrect ? 'border-green-500 bg-green-50' : 
+                                      selectedOptionId === option.id ? 'border-red-500 bg-red-50' : 
+                                      'border-gray-200'
+                                    }`}
+                                  >
+                                    <div className="flex items-center">
+                                      <span className={`inline-block w-6 h-6 rounded-full mr-2 text-center flex items-center justify-center ${
+                                        option.isCorrect ? 'bg-green-500 text-white' : 
+                                        selectedOptionId === option.id ? 'bg-red-500 text-white' : 
+                                        'bg-gray-100 text-gray-700'
+                                      }`}>
+                                        {String.fromCharCode(65 + idx % 26)}
+                                      </span>
+                                      <span className="flex-grow">{option.content}</span>
+                                      {option.isCorrect && (
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      )}
+                                      {selectedOptionId === option.id && !option.isCorrect && (
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                // 问卷未结束前显示的消息
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <h3 className="text-xl font-medium mb-2 text-gray-700">答案已提交</h3>
+                  <p className="text-gray-500">问卷结束后将显示您的分数和排名</p>
+                  {timeRemaining !== null && timeRemaining > 0 && (
+                    <p className="mt-4 text-blue-600 font-medium">
+                      剩余时间: {formatTime(timeRemaining)}
+                    </p>
+                  )}
                 </div>
               )}
               
@@ -715,6 +792,7 @@ export default function CourseQuizPage() {
     );
   }
 
+  // 显示问卷列表
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 text-gray-800 p-8">
       <div className="max-w-4xl mx-auto bg-white p-8 rounded-lg shadow-sm border border-gray-200">
@@ -755,49 +833,49 @@ export default function CourseQuizPage() {
                 const isCompleted = quiz.isActive && endTime && now > endTime;
                 
                 return (
-              <div key={quiz.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <h3 className="text-xl font-medium text-gray-800">{quiz.title}</h3>
-                    {quiz.description && (
-                      <p className="text-gray-600 mt-1">{quiz.description}</p>
-                    )}
-                  </div>
+                  <div key={quiz.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
+                    <div className="flex justify-between items-start mb-4">
+                      <div>
+                        <h3 className="text-xl font-medium text-gray-800">{quiz.title}</h3>
+                        {quiz.description && (
+                          <p className="text-gray-600 mt-1">{quiz.description}</p>
+                        )}
+                      </div>
                       <span className={`px-2 py-1 text-xs rounded ${
                         isActive ? "bg-green-100 text-green-800 border border-green-200" : 
                         "bg-blue-100 text-blue-800 border border-blue-200"
                       }`}>
                         {isActive ? "进行中" : "已结束"}
-                  </span>
-                </div>
-                
-                {quiz.startTime && quiz.endTime && (
-                  <div className="flex space-x-4 text-sm text-gray-500 mb-4">
-                    <span>开始: {new Date(quiz.startTime).toLocaleString()}</span>
-                    <span>结束: {new Date(quiz.endTime).toLocaleString()}</span>
-                  </div>
-                )}
-                
-                <div className="flex space-x-4">
+                      </span>
+                    </div>
+                    
+                    {quiz.startTime && quiz.endTime && (
+                      <div className="flex space-x-4 text-sm text-gray-500 mb-4">
+                        <span>开始: {new Date(quiz.startTime).toLocaleString()}</span>
+                        <span>结束: {new Date(quiz.endTime).toLocaleString()}</span>
+                      </div>
+                    )}
+                    
+                    <div className="flex space-x-4">
                       {isActive && (
-                  <button 
-                    className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300"
+                        <button 
+                          className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300"
                           onClick={() => handleStartQuiz(quiz)}
-                  >
-                    开始答题
-                  </button>
+                        >
+                          开始答题
+                        </button>
                       )}
                       {isCompleted && (
-                  <button 
-                    className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-600 rounded-md transition-colors border border-gray-300"
+                        <button 
+                          className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-600 rounded-md transition-colors border border-gray-300"
                           onClick={() => handleViewResults(quiz)}
-                  >
-                    查看结果
-                  </button>
+                        >
+                          查看结果
+                        </button>
                       )}
-                </div>
-              </div>
+                    </div>
+                  </div>
                 );
               })}
           </div>
