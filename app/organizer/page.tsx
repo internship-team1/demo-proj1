@@ -1276,23 +1276,35 @@ const fetchQuizComments = async () => {
                                 </div>
                               </div>
                               
-                              <h4 className="text-md font-medium mb-2 text-gray-700">题目统计</h4>
+                              {/* 移除"题目统计"字样 */}
                               {quiz.questions.map((q) => (
                                 <div key={q.questionId} className="mb-4 p-4 bg-gray-50 rounded border">
                                   <div className="font-medium mb-2">{q.questionText}</div>
-                                  <div className="text-sm text-gray-700">
-                                    答题人数：{q.total}，答对人数：{q.correct}，正确率：{q.correctRate !== undefined ? `${q.correctRate}%` : '--'}
-                                  </div>
-                                  {/* 选项统计，完整显示所有选项，带A/B/C/D前缀 */}
-                                  {q.options && q.options.length > 0 && q.options.map((opt: { text: string; count: number }, idx: number) => (
+                                  
+                                  {/* 显示正确率在选项列表的最上方 */}
+                                  {q.correctRate !== undefined && (
+                                    <div className="text-sm text-green-600 font-medium mb-2">正确率: {q.correctRate}%</div>
+                                  )}
+                                  
+                                  {/* 选项统计，使用isCorrect属性标识正确选项 */}
+                                  {q.options && q.options.length > 0 && q.options.map((opt: { text: string; count: number; isCorrect?: boolean }, idx: number) => (
                                     <div
                                       key={opt.text}
-                                      className="flex items-center w-full"
+                                      className="flex items-center w-full mb-2"
                                       title={opt.text}
                                     >
-                                      <span className="inline-block w-6 font-bold">{String.fromCharCode(65 + idx)}.</span>
+                                      {/* 选项字母，正确选项标绿 */}
+                                      <span className={`inline-flex items-center justify-center w-6 h-6 rounded-md font-bold ${opt.isCorrect ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-700'}`}>
+                                        {String.fromCharCode(65 + idx)}
+                                      </span>
+                                      {/* 选项内容 */}
                                       <span className="ml-2 flex-1 whitespace-pre-line break-words">{opt.text}</span>
-                                      <span className="ml-2 text-gray-500 text-sm">（{opt.count}人选择）</span>
+                                      {/* 选择人数，正确选项标绿 */}
+                                      <div className="flex flex-col items-end">
+                                        <span className={`text-sm ${opt.isCorrect ? 'text-green-600' : 'text-gray-500'}`}>
+                                          （{opt.count}人选择）
+                                        </span>
+                                      </div>
                                     </div>
                                   ))}
                                 </div>

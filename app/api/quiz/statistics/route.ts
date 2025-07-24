@@ -81,7 +81,8 @@ export async function GET(req: NextRequest) {
           });
           return {
             text: opt.content,
-            count
+            count,
+            isCorrect: opt.isCorrect
           };
         })
       );
