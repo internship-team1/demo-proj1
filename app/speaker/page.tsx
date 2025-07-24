@@ -547,25 +547,23 @@ const fetchQuizComments = async () => {
             {/* 课程标题 */}
             <h3 className="text-xl font-medium mb-2 text-gray-800">{course.title}</h3>
             
-            {/* 课程基础信息（始终显示） */}
-            <div className="flex flex-wrap gap-2 text-sm text-gray-500 mb-3">
-              <span className="bg-gray-100 px-2 py-1 rounded-md">
-                组织者: {course.organizer}
-              </span>
+            {/* 课程基础信息与课程码放在同一行，使用相同样式 */}
+            <div className="flex items-center flex-wrap text-sm text-gray-500 mb-4">
+              <span className="font-medium mr-2">课程码:</span>
+              <span className="bg-gray-100 px-3 py-1 rounded-md font-mono mr-4">{course.courseCode}</span>
+              
+              <span className="font-medium mr-2">组织者:</span>
+              <span className="bg-gray-100 px-3 py-1 rounded-md mr-4">{course.organizer}</span>
+              
               {course.speakerName && (
-                <span className="bg-gray-100 px-2 py-1 rounded-md">
-                  演讲者: {course.speakerName}
-                </span>
+                <>
+                  <span className="font-medium mr-2">演讲者:</span>
+                  <span className="bg-gray-100 px-3 py-1 rounded-md mr-4">{course.speakerName}</span>
+                </>
               )}
-              <span className="bg-gray-100 px-2 py-1 rounded-md">
-                成员数: {course.memberCount || 0}
-              </span>
-            </div>
-            
-            {/* 课程码（保持原有样式） */}
-            <div className="flex items-center space-x-2 text-sm text-gray-500 mb-4">
-              <span className="font-medium">课程码:</span>
-              <span className="bg-gray-100 px-3 py-1 rounded-md font-mono">{course.courseCode}</span>
+              
+              <span className="font-medium mr-2">成员数:</span>
+              <span className="bg-gray-100 px-3 py-1 rounded-md">{course.memberCount || 0}</span>
             </div>
 
             {/* 操作按钮（保持原有样式） */}
