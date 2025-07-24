@@ -24,11 +24,21 @@ interface Comment {
   timestamp: string;
 }
 
+// 添加全局定时器变量声明
+declare global {
+  interface Window {
+    quizCheckInterval: NodeJS.Timeout | null;
+  }
+}
+
 export default function AudiencePage() {
   const [activeTab, setActiveTab] = useState("courses");
   const [courseCode, setCourseCode] = useState("");
   const [message, setMessage] = useState("");
   const [courses, setCourses] = useState<Course[]>([]);
+  
+  // 添加定时器引用状态
+  const [checkInterval, setCheckInterval] = useState<NodeJS.Timeout | null>(null);
   
   // 留言相关状态
   const [showCommentModal, setShowCommentModal] = useState(false);
@@ -52,13 +62,17 @@ export default function AudiencePage() {
   const [showNewQuizAlert, setShowNewQuizAlert] = useState(false);
 
 // 添加检查新问卷的函数
-const checkNewQuizzes = async () => {
-  if (!currentUser?.id || courses.length === 0) return;
+const checkNewQuizzes = async (userId?: number, coursesList?: Course[]) => {
+  // 使用提供的参数或者当前状态
+  const id = userId || currentUser?.id;
+  const courseItems = coursesList || courses;
+  
+  if (!id || courseItems.length === 0) return;
   
   try {
     const params = new URLSearchParams({
-      userId: currentUser.id.toString(),
-      courseIds: courses.map(c => c.id).join(',')
+      userId: id.toString(),
+      courseIds: courseItems.map(c => c.id).join(',')
     });
 
     const res = await fetch(`/api/quiz/recent?${params}`);
@@ -67,6 +81,7 @@ const checkNewQuizzes = async () => {
     if (data.hasNewQuizzes && data.quizzes && data.quizzes.length > 0) {
       setNewQuizNotifications(data.quizzes);
       setShowNewQuizAlert(true);
+      console.log("显示新问卷通知:", data.quizzes);
     }
   } catch (error) {
     console.error('检查新问卷失败:', error);
@@ -79,69 +94,79 @@ useEffect(() => {
 }, [showNewQuizAlert]);
 
 useEffect(() => {
-  if (activeTab === "courses" && currentUser?.id && courses.length > 0) {
-    // 首次立即检查
-    checkNewQuizzes(); 
-    
-    // 每30秒检查一次
-    const timer = setInterval(checkNewQuizzes, 30000); 
-    return () => clearInterval(timer);
+  // 检查本地存储中是否有用户信息
+  const savedUser = localStorage.getItem('currentUser');
+  if (!savedUser) {
+    router.push("/");
+    return;
   }
-}, [activeTab, currentUser?.id, courses]);
-
-useEffect(() => {
-  console.log('【DEBUG】当前状态:', {
-    activeTab,
-    userId: currentUser?.id,
-    courseCount: courses.length,
-    lastCheck: localStorage.getItem('lastQuizCheck')
-  })
-}, [activeTab, currentUser, courses])
-
-  useEffect(() => {
-    // 检查本地存储中是否有用户信息
-    const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
+  
+  try {
     const user = JSON.parse(savedUser);
-    setNewUsername(user.username); // 初始化表单用户名
-    //const savedUser = localStorage.getItem('currentUser');
-    if (!savedUser) {
+    // 确保只有听众角色可以访问此页面
+    if (user.role !== "audience") {
       router.push("/");
       return;
     }
+    setCurrentUser(user);
+    setNewUsername(user.username);
+    
+    // 加载课程后立即检查新问卷通知
+    loadEnrolledCourses(user.id);
+  } catch (error) {
+    localStorage.removeItem('currentUser');
+    router.push("/");
+  }
+}, [router]);
+
+  // 修改加载课程函数，加载后立即检查新问卷
+  const loadEnrolledCourses = async (userId: number) => {
+    if (!userId) return;
     
     try {
-      const user = JSON.parse(savedUser);
-      // 确保只有听众角色可以访问此页面
-      if (user.role !== "audience") {
-        router.push("/");
-        return;
-      }
-      setCurrentUser(user);
-      setNewUsername(user.username);
-    } catch (error) {
-      localStorage.removeItem('currentUser');
-      router.push("/");
-    }
-  }}, [router]);
-  useEffect(() => {
-  const loadEnrolledCourses = async () => {
-    if (!currentUser?.id) return;
-    
-    try {
-      const res = await fetch(`/api/courses/enroll?userId=${currentUser.id}`);
+      const res = await fetch(`/api/courses/enroll?userId=${userId}`);
       const data = await res.json();
-      if (res.ok) setCourses(data.courses);
+      if (res.ok) {
+        setCourses(data.courses);
+        
+        // 课程加载成功后，立即检查是否有新问卷
+        if (data.courses && data.courses.length > 0) {
+          // 确保courses数据已经设置好后才检查
+          setTimeout(() => {
+            checkNewQuizzes(userId, data.courses);
+            
+            // 设置定期检查
+            const timer = setInterval(() => checkNewQuizzes(), 30000);
+            // 存储timer以便在组件卸载时清除
+            setCheckInterval(timer);
+          }, 500);
+        }
+      }
     } catch (error) {
       console.error("加载课程失败:", error);
     }
   };
+  
+  // 组件卸载时清理定时器
+  useEffect(() => {
+    return () => {
+      if (checkInterval) {
+        clearInterval(checkInterval);
+        setCheckInterval(null);
+      }
+    };
+  }, [checkInterval]);
 
-  loadEnrolledCourses();
-}, [currentUser?.id]); // 依赖用户ID
+  useEffect(() => {
+    console.log('【DEBUG】当前状态:', {
+      activeTab,
+      userId: currentUser?.id,
+      courseCount: courses.length,
+      lastCheck: localStorage.getItem('lastQuizCheck')
+    })
+  }, [activeTab, currentUser, courses])
 
-
- const fetchUserCourses = async () => {
+  const fetchUserCourses = async () => {
   try {
     const token = localStorage.getItem('authToken');
     const response = await fetch('/api/courses/enroll', {

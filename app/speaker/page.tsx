@@ -165,6 +165,11 @@ export default function SpeakerPage() {
       setCurrentUser(user);
       setNewUsername(user.username);
       
+      // 登录后立即检查统计通知
+      checkNewStatisticsNotification();
+      const interval = setInterval(checkNewStatisticsNotification, 30000);
+      return () => clearInterval(interval);
+      
       // 加载当前用户担任演讲者的课程
       fetchMySpeakerCourses(user.id);
     } catch (error) {
@@ -431,10 +436,13 @@ const fetchQuizComments = async () => {
     quizTitle: string;
   }>>([]);
 
-  const checkNewStatisticsNotification = async () => {
-    if (!currentUser) return;
+  // 修改为接受参数的函数，方便初始化时调用
+  const checkNewStatisticsNotification = async (userId?: number) => {
+    // 如果没有传入userId，则使用当前用户的id
+    const id = userId || currentUser?.id;
+    if (!id) return;
 
-    const res = await fetch(`/api/quiz/statistics/notify?userId=${currentUser.id}`);
+    const res = await fetch(`/api/quiz/statistics/notify?userId=${id}`);
     const data = await res.json();
 
     if (data.hasNewStatistics && data.notifications && data.notifications.length > 0) {
@@ -451,12 +459,11 @@ const fetchQuizComments = async () => {
     }
   };
 
+  // 删除或修改此useEffect，因为我们在登录后就已经设置了检查
+  // 在activeTab变为"statistics"时不需要重新设置interval
   useEffect(() => {
-    if (activeTab === "statistics" && currentUser) {
-      checkNewStatisticsNotification();
-      const interval = setInterval(checkNewStatisticsNotification, 30000);
-      return () => clearInterval(interval);
-    }
+    // 不再需要这个Effect，登录时已经设置好了
+    // 保留空函数以便进行代码修改
   }, [activeTab, currentUser]);
 
   const handleCloseStatisticsNotification = () => {

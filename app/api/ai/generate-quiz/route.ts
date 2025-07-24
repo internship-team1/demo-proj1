@@ -533,6 +533,7 @@ async function callPdfByFilenameOnly(filename: string) {
   6. 使用中文生成所有问题和选项
   7. 确保问题与主题相关且具有教育价值
   8. 选项应该合理且有区分度，包含一个正确答案和三个合理但不正确的干扰项
+  9. 不要在题目或选项中使用"PDF"、"文档中"、"文档内"等提及源文件格式的字样
   
   请以下面的JSON格式返回:
   {
@@ -652,8 +653,9 @@ async function callOpenAIFormat(content: string, filename?: string, fileType?: s
   2. 确保问题涵盖内容的关键概念和重要信息
   3. 选项应该合理且有区分度，包含一个正确答案和三个合理但不正确的干扰项
   4. 对于较短或提取质量不高的内容，请根据可用信息尽量生成相关问题
+  5. 严禁在题目或选项中使用"幻灯片"、"该幻灯片"、"幻灯片中"等提及源文件格式的字样
   `}
-  5. 使用中文生成所有问题和选项
+  6. 使用中文生成所有问题和选项
 
   ${filename ? `文件名: ${filename}${fileType ? `\n文件类型: ${fileType}` : ''}` : ''}
   
@@ -808,8 +810,9 @@ async function callDirectAPI(content: string, filename?: string, fileType?: stri
     2. Do NOT generate questions based on filenames or file descriptions
     3. Ensure questions cover key concepts and important information from the content
     4. Each question should have one correct answer and three plausible but incorrect distractors
+    5. NEVER use terms like "slide", "in this slide", "the slide shows" or similar phrases that reference the source format
     `}
-    5. Output all questions and options in Chinese
+    6. Output all questions and options in Chinese
     
     ${filename ? `文件名: ${filename}${fileType ? `\n文件类型: ${fileType}` : ''}` : ''}
     

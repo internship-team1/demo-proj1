@@ -308,7 +308,8 @@ export async function POST(request: NextRequest) {
                   }).filter(text => text.length > 0);
                   
                   if (texts.length > 0) {
-                    slideContents.push(`幻灯片 ${slideContents.length + 1}:\n${texts.join('\n')}`);
+                    // 直接追加文本内容，不添加"幻灯片 X:"前缀
+                    slideContents.push(texts.join('\n'));
                   }
                 } catch (slideError) {
                   console.error(`处理幻灯片 ${slideFile} 失败:`, slideError);
@@ -328,7 +329,8 @@ export async function POST(request: NextRequest) {
                 const presentationXml = fs.readFileSync(presentationFile, 'utf8');
                 const titleMatch = presentationXml.match(/<a:title>([^<]+)<\/a:title>/);
                 if (titleMatch && titleMatch[1]) {
-                  pptContent = `标题: ${titleMatch[1]}\n\n` + pptContent;
+                  // 直接将标题添加到内容的开头，但不添加"标题:"前缀
+                  pptContent = `${titleMatch[1]}\n\n` + pptContent;
                 }
               }
             } catch (titleError) {
