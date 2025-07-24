@@ -40,7 +40,9 @@ npm install
 3. **数据库配置**
 
 - 在项目根目录创建一个名为 `.env` 的文件（右键点击 → 新建 → 文件，命名为 `.env`）
-- 在文件中添加群里提供的env文本内容
+```
+DATABASE_URL="postgres://neondb_owner:npg_ugcoW5CEM8hG@ep-black-math-adudwgbc-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
+```
 
 4. **应用数据库迁移**
 
@@ -87,7 +89,7 @@ git pull
 ```
 - 完成一个功能可以正常运行后才能推送到仓库，否则其他队员在开发时无法确定是自己的代码有问题还是别人的有问题
 - 命令ai辅助编程时使用步骤化精细化的命令，不要只是笼统的概括
-- 项目已部署，推送到 Git 仓库后会自动更新，https://popquiz-nine.vercel.app/ 查看已开发的功能是否正常以及总体进度
+- 项目已部署，推送到 Git 仓库后会自动更新，https://popquiz-nine.vercel.app/ （需要挂梯子才能访问）
 
 ## 项目结构
 
