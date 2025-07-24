@@ -15,7 +15,22 @@ export async function GET(request: Request) {
 
   try {
     const comments = await prisma.comment.findMany({
-      where: { courseId: Number(courseId) },
+      where: { 
+        courseId: Number(courseId),
+        // 排除系统通知记录
+        NOT: {
+          content: {
+            startsWith: "QUIZ_NOTIFY_",
+          },
+        },
+        AND: {
+          NOT: {
+            content: {
+              startsWith: "STAT_NOTIFY_",
+            },
+          },
+        }
+      },
       include: { user: { select: { id: true, username: true } } },
       orderBy: { createdAt: 'desc' }
     })

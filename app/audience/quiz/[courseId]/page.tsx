@@ -407,12 +407,12 @@ export default function CourseQuizPage() {
       
       if (!response.ok) throw new Error("提交评论失败");
       
-      const result = await response.json();
+      // API现在直接返回新创建的评论对象
+      const newCommentData = await response.json();
       
-      if (result.success && result.comment) {
-        setComments(prev => [result.comment, ...prev]);
-        setNewComment("");
-      }
+      // 直接将新评论添加到评论列表的开头
+      setComments(prev => [newCommentData, ...prev]);
+      setNewComment(""); // 清空输入框
     } catch (error) {
       console.error("提交评论失败:", error);
     }
@@ -542,10 +542,13 @@ export default function CourseQuizPage() {
               {quizEnded ? (
                 <>
                   {/* 合并分数和排名信息，只显示必要信息 */}
-                  <div className="text-center py-6 mb-4 bg-gray-50 rounded-lg">
+                  <div className="text-center py-6 mb-4 bg-gray-50 rounded-lg relative">
                     {score && userRanking && (
                       <>
-                        <h3 className="text-5xl font-bold mb-3">{score.percentage}%</h3>
+                        <div className="absolute top-2 left-4 text-blue-600 text-sm font-medium">
+                          正确率
+                        </div>
+                        <h3 className="text-5xl font-bold mb-3 text-blue-600">{score.percentage}%</h3>
                         <p className="text-gray-700 text-lg font-medium">
                           第 {userRanking.rank} 名
                           {rankings.length > 1 && <span className="text-sm text-gray-500 ml-2">(共 {rankings.length} 人)</span>}
@@ -556,34 +559,7 @@ export default function CourseQuizPage() {
                   
                   {/* 移除排名显示独立区块 */}
                   
-                  {/* 保留排行榜，但简化显示 */}
-                  {rankings.length > 1 && (
-                    <div className="mb-8">
-                      <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-                        <table className="min-w-full">
-                          <thead className="bg-gray-50">
-                            <tr>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">排名</th>
-                              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">用户</th>
-                              <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">得分</th>
-                            </tr>
-                          </thead>
-                          <tbody className="bg-white divide-y divide-gray-200">
-                            {rankings.slice(0, 10).map((rank) => (
-                              <tr key={rank.userId} className={rank.userId === currentUser?.id ? "bg-blue-50" : ""}>
-                                <td className="px-6 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{rank.rank}</td>
-                                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">
-                                  {rank.username}
-                                  {rank.userId === currentUser?.id && <span className="ml-2 text-blue-500">(我)</span>}
-                                </td>
-                                <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500 text-right">{rank.percentage}%</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
+                  {/* 移除排行榜 */}
                   
                   {/* 问题回顾 */}
                   {activeQuiz.questions && activeQuiz.questions.length > 0 && (

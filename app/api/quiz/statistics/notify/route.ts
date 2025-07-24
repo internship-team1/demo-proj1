@@ -18,29 +18,70 @@ export async function GET(req: NextRequest) {
   } else {
     courses = await prisma.course.findMany({ where: { speakerId: userId } });
   }
-  const courseIds = (courses as { id: number }[]).map((c) => c.id);
+
+  if (!courses || courses.length === 0) {
+    return NextResponse.json({ hasNewStatistics: false });
+  }
 
   // 当前时间
   const now = new Date();
-
-  // 查询所有已到答题截止时间的 Quiz
-  const quizzes = await prisma.quiz.findMany({
-    where: {
-      courseId: { in: courseIds },
-      createdAt: { lte: new Date(now.getTime() - 2 * 60 * 1000) }, // 2分钟已到
-      // 你可以根据需要调整时间判断
-    },
-    orderBy: { createdAt: "desc" }
-  });
-
-  // 返回最近一个 Quiz
-  if (quizzes.length > 0) {
-    const quiz = quizzes[0];
+  
+  // 存储需要通知的课程和问卷信息
+  const pendingNotifications = [];
+  
+  // 对每个课程，找出最近结束的问卷
+  for (const course of courses) {
+    // 查找该课程下最近结束且处于活跃状态的问卷
+    const latestQuiz = await prisma.quiz.findFirst({
+      where: {
+        courseId: course.id,
+        endTime: { lte: now }, // 结束时间已过
+        isActive: true
+      },
+      orderBy: { endTime: "desc" }
+    });
+    
+    if (latestQuiz) {
+      // 查找是否已经通知过这个问卷
+      const notificationKey = `STAT_NOTIFY_${latestQuiz.id}_${userId}`;
+      const existingNotification = await prisma.comment.findFirst({
+        where: {
+          content: notificationKey,
+          userId
+        }
+      });
+      
+      // 如果没有通知过，则添加到待通知列表
+      if (!existingNotification) {
+        pendingNotifications.push({
+          courseId: course.id,
+          courseTitle: course.title,
+          quizId: latestQuiz.id,
+          quizTitle: latestQuiz.title,
+          notificationKey
+        });
+      }
+    }
+  }
+  
+  // 如果有需要通知的问卷
+  if (pendingNotifications.length > 0) {
+    // 为每个通知在数据库中创建标记（使用Comment表作为临时存储）
+    for (const notification of pendingNotifications) {
+      await prisma.comment.create({
+        data: {
+          content: notification.notificationKey,
+          userId,
+          courseId: notification.courseId,
+          quizId: notification.quizId,
+          createdAt: now
+        }
+      });
+    }
+    
     return NextResponse.json({
       hasNewStatistics: true,
-      quizId: quiz.id,
-      quizTitle: quiz.title,
-      notifyTime: new Date(quiz.createdAt.getTime() + 2 * 60 * 1000)
+      notifications: pendingNotifications
     });
   }
 

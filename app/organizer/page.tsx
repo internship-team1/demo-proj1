@@ -919,29 +919,30 @@ const fetchQuizComments = async () => {
     }
   }, [selectedQuiz]);
 
+  // 添加状态存储多个通知
+  const [pendingNotifications, setPendingNotifications] = useState<Array<{
+    courseId: number;
+    courseTitle: string;
+    quizId: number;
+    quizTitle: string;
+  }>>([]);
+
   const checkNewStatisticsNotification = async () => {
     if (!currentUser) return;
 
     const res = await fetch(`/api/quiz/statistics/notify?userId=${currentUser.id}`);
     const data = await res.json();
 
-    if (data.hasNewStatistics && data.quizId) {
-      // 检查本地是否已关闭过该 quiz 的通知
-      if (!localStorage.getItem(`statisticsNotificationClosed_${data.quizId}`)) {
-        setShowStatisticsNotification(true);
-        setCurrentQuizId(data.quizId);
-        setCurrentQuizTitle(data.quizTitle);
+    if (data.hasNewStatistics && data.notifications && data.notifications.length > 0) {
+      setShowStatisticsNotification(true);
+      setPendingNotifications(data.notifications);
 
-        // 1分钟后自动关闭
-        if (!statisticsNotificationTimeout) {
-          const timeout = setTimeout(() => {
-            setShowStatisticsNotification(false);
-            if (data.quizId) {
-              localStorage.setItem(`statisticsNotificationClosed_${data.quizId}`, "1");
-            }
-          }, 60000);
-          setStatisticsNotificationTimeout(timeout);
-        }
+      // 1分钟后自动关闭
+      if (!statisticsNotificationTimeout) {
+        const timeout = setTimeout(() => {
+          setShowStatisticsNotification(false);
+        }, 60000);
+        setStatisticsNotificationTimeout(timeout);
       }
     }
   };
@@ -1485,40 +1486,39 @@ const fetchQuizComments = async () => {
       
       {showStatisticsNotification && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg animate-pop-in">
-            <h3 className="text-xl font-bold mb-2">📢 新统计结果</h3>
-            <p>有新的问卷统计消息【{currentQuizTitle}】，请及时查看！</p>
-            <div className="flex gap-3 mt-4">
+          <div className="bg-white p-6 rounded-lg animate-pop-in max-w-md">
+            <h3 className="text-xl font-bold mb-2">📊 统计结果可用</h3>
+            
+            {pendingNotifications.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-2">以下课程的问卷统计结果可供查看：</p>
+                <ul className="list-disc pl-5 mb-3">
+                  {/* 使用Set来确保课程不重复 */}
+                  {Array.from(new Set(pendingNotifications.map(n => n.courseId))).map((courseId) => {
+                    const notification = pendingNotifications.find(n => n.courseId === courseId);
+                    return (
+                      <li key={courseId} className="mb-1">
+                        课程【{notification?.courseTitle || '未知课程'}】
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+            
+            <div className="flex justify-center">
               <button
                 onClick={() => {
-                  if (currentQuizId) {
-                    localStorage.setItem(`statisticsNotificationClosed_${currentQuizId}`, "1");
-                  }
                   setShowStatisticsNotification(false);
+                  // 移除自动跳转到统计页面
                   if (statisticsNotificationTimeout) {
                     clearTimeout(statisticsNotificationTimeout);
                     setStatisticsNotificationTimeout(null);
                   }
                 }}
-                className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
+                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
               >
-                忽略
-              </button>
-              <button
-                onClick={() => {
-                  if (currentQuizId) {
-                    localStorage.setItem(`statisticsNotificationClosed_${currentQuizId}`, "1");
-                  }
-                  setShowStatisticsNotification(false);
-                  setActiveTab("statistics");
-                  if (statisticsNotificationTimeout) {
-                    clearTimeout(statisticsNotificationTimeout);
-                    setStatisticsNotificationTimeout(null);
-                  }
-                }}
-                className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
-              >
-                查看
+                确认
               </button>
             </div>
           </div>
