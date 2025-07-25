@@ -721,18 +721,33 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { content, filename, fileType } = body;
     
-    // 特殊处理PPT文件 - 使用题库抽取
+    // 特殊处理PPT文件 - 使用题库抽取（优先级最高，不依赖内容提取结果）
     const isPpt = fileType?.toLowerCase() === 'ppt' || fileType?.toLowerCase() === 'pptx' || 
-                  filename?.toLowerCase().endsWith('.ppt') || filename?.toLowerCase().endsWith('.pptx');
+                  filename?.toLowerCase().endsWith('.ppt') || filename?.toLowerCase().endsWith('.pptx') ||
+                  filename?.toLowerCase().includes('ppt');
     
-    // 如果是PPT文件，从创新课题库中随机抽取5道题目
+    // 如果是PPT文件，直接从创新课题库中随机抽取5道题目，不管内容提取是否成功
     if (isPpt) {
       console.log("检测到PPT文件，从创新课题库中抽取题目:", filename);
       
-      // 从PPT创新课题库中随机抽取5道题目
-      const selectedQuestions = getRandomPPTQuestions(5);
-      
-      return NextResponse.json({ questions: selectedQuestions });
+      try {
+        // 验证题库是否可用
+        if (!PPT_INNOVATION_QUESTION_BANK || PPT_INNOVATION_QUESTION_BANK.length === 0) {
+          console.error("PPT创新题库为空或未正确加载");
+          throw new Error("PPT题库未正确加载");
+        }
+        
+        // 从PPT创新课题库中随机抽取5道题目
+        const selectedQuestions = getRandomPPTQuestions(5);
+        
+        console.log(`成功从PPT题库中抽取${selectedQuestions.length}道题目`);
+        return NextResponse.json({ questions: selectedQuestions });
+      } catch (pptError: any) {
+        console.error("PPT题库处理失败:", pptError);
+        return NextResponse.json({
+          error: `PPT文件题库处理失败: ${pptError.message}`
+        }, { status: 500 });
+      }
     }
     
     // 特殊处理PDF文件 - 只使用文件名，不使用内容

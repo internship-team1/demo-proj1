@@ -56,6 +56,31 @@ export async function DELETE(request: Request) {
       );
     }
 
+    // 检查用户是否有关联数据（外键约束）
+    const hasConstraints = await Promise.all([
+      prisma.courses.findFirst({ where: { organizerId: parseInt(userId) } }),
+      prisma.files.findFirst({ where: { uploaderId: parseInt(userId) } }),
+      prisma.answers.findFirst({ where: { userId: parseInt(userId) } }),
+      prisma.comments.findFirst({ where: { userId: parseInt(userId) } })
+    ]);
+
+    const [organizedCourses, uploadedFiles, userAnswers, userComments] = hasConstraints;
+
+    if (organizedCourses || uploadedFiles || userAnswers || userComments) {
+      let errorDetails = [];
+      if (organizedCourses) errorDetails.push('已组织的课程');
+      if (uploadedFiles) errorDetails.push('上传的文件');
+      if (userAnswers) errorDetails.push('测验答题记录');
+      if (userComments) errorDetails.push('评论留言');
+
+      return NextResponse.json(
+        { 
+          error: `该用户有关联数据，无法删除。存在：${errorDetails.join('、')}。请先清理相关数据或联系技术支持处理。` 
+        },
+        { status: 400 }
+      );
+    }
+
     // 删除用户
     await prisma.users.delete({
       where: { id: parseInt(userId) }

@@ -266,26 +266,30 @@ export async function POST(request: NextRequest) {
           
           // 只处理.pptx格式，.ppt格式需要不同的处理方法
           if (fileExtension === '.ppt') {
-            console.warn("暂不支持.ppt格式，请使用.pptx格式");
+            console.warn("暂不支持.ppt格式，但会返回基本信息用于题库抽题");
             content = `
 文件名: ${fileName}
 文件类型: PowerPoint演示文稿 (.ppt格式)
 文件大小: ${Math.round(buffer.length / 1024)} KB
 
-暂不支持.ppt格式文件。请将文件另存为.pptx格式后重新上传。
+注意：.ppt格式文件内容提取受限，但系统会从相关题库中为您生成测验题目。
 
-转换方法:
+建议：如需完整内容提取，请将文件另存为.pptx格式：
 1. 在PowerPoint中打开该文件
 2. 点击"文件" -> "另存为"
 3. 选择文件格式为"PowerPoint演示文稿(.pptx)"
 4. 保存并重新上传
             `;
-            return NextResponse.json({ content });
+            // 不要直接return，让content传递给后续的题库逻辑
           }
           
-          try {
-            // 使用adm-zip解压并提取PPTX内容
-            console.log("尝试使用adm-zip解压PPTX");
+          // 对于.ppt格式，跳过复杂的内容提取，直接使用已设置的content
+          if (fileExtension === '.ppt') {
+            // content已经在上面设置了，直接跳到最后返回
+          } else {
+            try {
+              // 使用adm-zip解压并提取PPTX内容
+              console.log("尝试使用adm-zip解压PPTX");
             const AdmZip = await import('adm-zip').then(m => m.default || m);
             
             if (!AdmZip) {
@@ -399,19 +403,21 @@ export async function POST(request: NextRequest) {
               console.error("提取演示文稿标题失败:", titleError);
             }
             
-          } catch (zipError: any) {
-            console.error("PPTX解压或解析失败:", zipError);
-          }
-          
-          // 检查提取结果并提供详细反馈
-          if (!pptContent || pptContent.trim().length < 20) {
-            console.warn(`PowerPoint内容提取不足，长度: ${pptContent ? pptContent.length : 0}`);
-            const fileInfo = `
+            } catch (zipError: any) {
+              console.error("PPTX解压或解析失败:", zipError);
+            }
+            
+            // 检查提取结果并提供详细反馈
+            if (!pptContent || pptContent.trim().length < 20) {
+              console.warn(`PowerPoint内容提取不足，长度: ${pptContent ? pptContent.length : 0}`);
+              const fileInfo = `
 文件名: ${fileName}
 文件类型: PowerPoint演示文稿 (.pptx)
 文件大小: ${Math.round(buffer.length / 1024)} KB
 
 提取到的内容长度: ${pptContent ? pptContent.length : 0} 字符
+
+注意：内容提取不完整，但系统会从相关题库中为您生成测验题目。
 
 无法提取足够的PowerPoint文本内容，可能的原因:
 1. 演示文稿主要包含图像、图表而非文本
@@ -426,11 +432,12 @@ export async function POST(request: NextRequest) {
 4. 考虑将内容复制到Word文档中再上传
 
 提取到的部分内容: ${pptContent ? pptContent.substring(0, 200) + '...' : '无'}
-            `;
-            content = fileInfo;
-          } else {
-            console.log(`PowerPoint内容提取成功，总长度: ${pptContent.length} 字符`);
-            content = pptContent;
+              `;
+              content = fileInfo;
+            } else {
+              console.log(`PowerPoint内容提取成功，总长度: ${pptContent.length} 字符`);
+              content = pptContent;
+            }
           }
         } catch (error: any) {
           console.error("PowerPoint处理失败:", error);
