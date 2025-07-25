@@ -58,10 +58,10 @@ export async function DELETE(request: Request) {
 
     // 检查用户是否有关联数据（外键约束）
     const hasConstraints = await Promise.all([
-      prisma.courses.findFirst({ where: { organizerId: parseInt(userId) } }),
-      prisma.files.findFirst({ where: { uploaderId: parseInt(userId) } }),
-      prisma.answers.findFirst({ where: { userId: parseInt(userId) } }),
-      prisma.comments.findFirst({ where: { userId: parseInt(userId) } })
+      prisma.course.findFirst({ where: { organizerId: parseInt(userId) } }),
+      prisma.file.findFirst({ where: { uploaderId: parseInt(userId) } }),
+      prisma.answer.findFirst({ where: { userId: parseInt(userId) } }),
+      prisma.comment.findFirst({ where: { userId: parseInt(userId) } })
     ]);
 
     const [organizedCourses, uploadedFiles, userAnswers, userComments] = hasConstraints;
