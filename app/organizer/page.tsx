@@ -202,9 +202,9 @@ useEffect(() => {
       setCurrentUser(user);
       setNewUsername(user.username);
       
-      // 登录后立即检查统计通知
-      checkNewStatisticsNotification();
-      const interval = setInterval(checkNewStatisticsNotification, 30000);
+      // 登录后立即检查统计通知，传入用户ID
+      checkNewStatisticsNotification(user.id);
+      const interval = setInterval(() => checkNewStatisticsNotification(user.id), 30000);
       return () => clearInterval(interval);
     } catch (error) {
       localStorage.removeItem('currentUser');
@@ -947,20 +947,32 @@ const fetchQuizComments = async () => {
     const id = userId || currentUser?.id;
     if (!id) return;
 
-    const res = await fetch(`/api/quiz/statistics/notify?userId=${id}`);
-    const data = await res.json();
-
-    if (data.hasNewStatistics && data.notifications && data.notifications.length > 0) {
-      setShowStatisticsNotification(true);
-      setPendingNotifications(data.notifications);
-
-      // 1分钟后自动关闭
-      if (!statisticsNotificationTimeout) {
-        const timeout = setTimeout(() => {
-          setShowStatisticsNotification(false);
-        }, 60000);
-        setStatisticsNotificationTimeout(timeout);
+    try {
+      console.log('检查统计通知，用户ID:', id);
+      const res = await fetch(`/api/quiz/statistics/notify?userId=${id}`);
+      
+      if (!res.ok) {
+        console.error('获取统计通知失败:', res.status, res.statusText);
+        return;
       }
+      
+      const data = await res.json();
+      console.log('统计通知数据:', data);
+
+      if (data.hasNewStatistics && data.notifications && data.notifications.length > 0) {
+        setShowStatisticsNotification(true);
+        setPendingNotifications(data.notifications);
+
+        // 1分钟后自动关闭
+        if (!statisticsNotificationTimeout) {
+          const timeout = setTimeout(() => {
+            setShowStatisticsNotification(false);
+          }, 60000);
+          setStatisticsNotificationTimeout(timeout);
+        }
+      }
+    } catch (error) {
+      console.error('检查统计通知时发生错误:', error);
     }
   };
 

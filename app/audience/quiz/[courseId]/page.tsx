@@ -228,6 +228,8 @@ export default function CourseQuizPage() {
         const scoreData = await scoreResponse.json();
         if (scoreData.success) {
           setScore(scoreData.score);
+          setSelectedAnswers(scoreData.answers); // 设置用户的答案
+          console.log('设置用户答案:', scoreData.answers);
         }
       }
       
@@ -567,46 +569,79 @@ export default function CourseQuizPage() {
                   <h3 className="text-xl font-semibold mb-4">测验回顾</h3>
                   
                   <div className="space-y-6">
-                    {activeQuiz.questions.map((question, idx) => {
+                    {activeQuiz.questions.map((question, questionIdx) => {
                       const selectedOptionId = selectedAnswers[question.id];
                       const correctOption = question.options.find(opt => opt.isCorrect);
                       const isCorrect = selectedOptionId !== undefined && correctOption && selectedOptionId === correctOption.id;
                       
+                      
                       return (
-                        <div key={question.id} className="pb-4">
-                          <h4 className="font-medium mb-3">{question.content}</h4>
-                          <div className="space-y-2">
-                            {question.options.map(option => (
-                              <div 
-                                key={option.id} 
-                                className={`p-3 rounded-md border ${
-                                  option.isCorrect ? 'border-green-500 bg-green-50' : 
-                                  selectedOptionId === option.id ? 'border-red-500 bg-red-50' : 
-                                  'border-gray-200'
-                                }`}
-                              >
-                                <div className="flex items-center">
-                                  <span className={`inline-block w-6 h-6 rounded-full mr-2 text-center flex items-center justify-center ${
-                                    option.isCorrect ? 'bg-green-500 text-white' : 
-                                    selectedOptionId === option.id ? 'bg-red-500 text-white' : 
-                                    'bg-gray-100 text-gray-700'
-                                  }`}>
-                                    {String.fromCharCode(65 + idx % 26)}
-                                  </span>
-                                  <span className="flex-grow">{option.content}</span>
-                                  {option.isCorrect && (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                    </svg>
-                                  )}
-                                  {selectedOptionId === option.id && !option.isCorrect && (
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                    </svg>
-                                  )}
+                        <div key={question.id} className="pb-6 border-b border-gray-100 last:border-b-0">
+                          <h4 className="font-semibold mb-4 text-gray-800">
+                            第 {questionIdx + 1} 题: {question.content}
+                          </h4>
+                          <div className="space-y-3">
+                            {question.options.map((option, optionIdx) => {
+                              const isUserSelected = selectedOptionId === option.id;
+                              const isCorrectAnswer = option.isCorrect;
+                              
+                              
+                              // 确定样式
+                              let optionStyle = '';
+                              let iconElement = null;
+                              
+                              if (isCorrectAnswer) {
+                                // 正确答案：绿色背景
+                                optionStyle = 'border-green-500 bg-green-50 text-green-800';
+                                iconElement = (
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-600" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                  </svg>
+                                );
+                              } else if (isUserSelected && !isCorrectAnswer) {
+                                // 用户选择的错误答案：红色背景
+                                optionStyle = 'border-red-500 bg-red-50 text-red-800';
+                                iconElement = (
+                                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-600" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                  </svg>
+                                );
+                              } else {
+                                // 其他选项：灰色背景
+                                optionStyle = 'border-gray-200 bg-gray-50 text-gray-600';
+                              }
+                              
+                              return (
+                                <div 
+                                  key={option.id} 
+                                  className={`p-4 rounded-lg border-2 ${optionStyle} transition-all`}
+                                >
+                                  <div className="flex items-center">
+                                    <span className={`inline-block w-8 h-8 rounded-full mr-3 text-center flex items-center justify-center font-medium text-sm ${
+                                      isCorrectAnswer ? 'bg-green-600 text-white' : 
+                                      (isUserSelected && !isCorrectAnswer) ? 'bg-red-500 text-white' : 
+                                      'bg-gray-300 text-gray-700'
+                                    }`}>
+                                      {String.fromCharCode(65 + optionIdx)}
+                                    </span>
+                                    <span className="flex-grow font-medium">{option.content}</span>
+                                    <div className="flex items-center space-x-2">
+                                      {isUserSelected && (
+                                        <span className="text-xs px-2 py-1 rounded-full bg-white/50 text-current">
+                                          你的选择
+                                        </span>
+                                      )}
+                                      {isCorrectAnswer && (
+                                        <span className="text-xs px-2 py-1 rounded-full bg-white/50 text-current">
+                                          正确答案
+                                        </span>
+                                      )}
+                                      {iconElement}
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              );
+                            })}
                           </div>
                         </div>
                       );
