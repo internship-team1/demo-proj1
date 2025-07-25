@@ -140,13 +140,19 @@ export default function OrganizerPage() {
 
 const [extraInfo, setExtraInfo] = useState<Record<string, CourseExtraInfo>>({});
 // 获取课程额外信息
-  useEffect(() => {
-  fetch('/api/courses/extra-info')
-    .then(res => res.json())
-    .then(data => {
-      console.log("API返回数据:", data); // 检查数据是否正常
-      setExtraInfo(data);
-    });
+const fetchExtraInfo = async () => {
+  try {
+    const res = await fetch('/api/courses/extra-info');
+    const data = await res.json();
+    console.log("API返回数据:", data); // 检查数据是否正常
+    setExtraInfo(data);
+  } catch (error) {
+    console.error("获取课程额外信息失败:", error);
+  }
+};
+
+useEffect(() => {
+  fetchExtraInfo();
 }, []);
 
   // 当选择的课程变化时加载留言
@@ -256,6 +262,9 @@ const fetchQuizComments = async () => {
     // 只显示当前organizer的课程
     const filtered = Array.isArray(data) ? data.filter((c: any) => c.organizerId === currentUser?.id) : [];
     setCourses(filtered);
+    
+    // 重新加载课程额外信息
+    fetchExtraInfo();
   };
   const handleCreateCourse = async () => {
     if (!courseTitle.trim()) {
@@ -1072,7 +1081,7 @@ const fetchQuizComments = async () => {
                         <span className="bg-gray-100 px-3 py-1 rounded-md font-mono mr-4">{course.courseCode}</span>
                         
                         <span className="font-medium mr-2">组织者:</span>
-                        <span className="bg-gray-100 px-3 py-1 rounded-md mr-4">{extraInfo[course.id]?.organizer || '加载中...'}</span>
+                        <span className="bg-gray-100 px-3 py-1 rounded-md mr-4">{extraInfo[course.id]?.organizer || currentUser?.username || '加载中...'}</span>
                         
                         {extraInfo[course.id]?.speaker && (
                           <>

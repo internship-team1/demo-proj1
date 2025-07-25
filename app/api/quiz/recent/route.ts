@@ -17,14 +17,14 @@ export async function GET(request: Request) {
     for (const courseId of courseIds) {
       // 查询该课程最新创建的活跃问卷
       const latestQuiz = await prisma.quiz.findFirst({
-        where: {
+      where: {
           courseId,
           isActive: true
-        },
-        orderBy: { createdAt: 'desc' },
+      },
+      orderBy: { createdAt: 'desc' },
         include: {
           course: {
-            select: {
+      select: {
               title: true
             }
           }
@@ -59,8 +59,8 @@ export async function GET(request: Request) {
               courseId: latestQuiz.courseId,
               quizId: latestQuiz.id,
               createdAt: new Date()
-            }
-          });
+      }
+    });
         }
       }
     }

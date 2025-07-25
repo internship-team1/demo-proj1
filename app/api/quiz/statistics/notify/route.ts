@@ -25,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   // 当前时间
   const now = new Date();
-  
+
   // 存储需要通知的课程和问卷信息
   const pendingNotifications = [];
   
@@ -33,14 +33,14 @@ export async function GET(req: NextRequest) {
   for (const course of courses) {
     // 查找该课程下最近结束且处于活跃状态的问卷
     const latestQuiz = await prisma.quiz.findFirst({
-      where: {
+    where: {
         courseId: course.id,
         endTime: { lte: now }, // 结束时间已过
         isActive: true
-      },
+    },
       orderBy: { endTime: "desc" }
-    });
-    
+  });
+
     if (latestQuiz) {
       // 查找是否已经通知过这个问卷
       const notificationKey = `STAT_NOTIFY_${latestQuiz.id}_${userId}`;

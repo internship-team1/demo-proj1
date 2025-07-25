@@ -93,30 +93,30 @@ useEffect(() => {
   console.log('弹窗状态变化:', showNewQuizAlert);
 }, [showNewQuizAlert]);
 
-useEffect(() => {
-  // 检查本地存储中是否有用户信息
-  const savedUser = localStorage.getItem('currentUser');
-  if (!savedUser) {
-    router.push("/");
-    return;
-  }
-  
-  try {
-    const user = JSON.parse(savedUser);
-    // 确保只有听众角色可以访问此页面
-    if (user.role !== "audience") {
+  useEffect(() => {
+    // 检查本地存储中是否有用户信息
+    const savedUser = localStorage.getItem('currentUser');
+    if (!savedUser) {
       router.push("/");
       return;
     }
-    setCurrentUser(user);
-    setNewUsername(user.username);
+    
+    try {
+      const user = JSON.parse(savedUser);
+      // 确保只有听众角色可以访问此页面
+      if (user.role !== "audience") {
+        router.push("/");
+        return;
+      }
+      setCurrentUser(user);
+      setNewUsername(user.username);
     
     // 加载课程后立即检查新问卷通知
     loadEnrolledCourses(user.id);
-  } catch (error) {
-    localStorage.removeItem('currentUser');
-    router.push("/");
-  }
+    } catch (error) {
+      localStorage.removeItem('currentUser');
+      router.push("/");
+    }
 }, [router]);
 
   // 修改加载课程函数，加载后立即检查新问卷
@@ -146,7 +146,7 @@ useEffect(() => {
       console.error("加载课程失败:", error);
     }
   };
-  
+
   // 组件卸载时清理定时器
   useEffect(() => {
     return () => {
@@ -166,7 +166,7 @@ useEffect(() => {
     })
   }, [activeTab, currentUser, courses])
 
-  const fetchUserCourses = async () => {
+ const fetchUserCourses = async () => {
   try {
     const token = localStorage.getItem('authToken');
     const response = await fetch('/api/courses/enroll', {
@@ -651,7 +651,7 @@ const handleUpdatePassword = async () => {
 
       {/* 新问卷提醒 */}
       {activeTab === "courses" && showNewQuizAlert && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg animate-pop-in max-w-md">
             <h3 className="text-xl font-bold mb-2">📝 新问卷通知</h3>
             
@@ -673,18 +673,18 @@ const handleUpdatePassword = async () => {
             )}
             
             <div className="flex justify-center">
-              <button
-                onClick={() => {
+        <button
+          onClick={() => {
                   setShowNewQuizAlert(false);
-                }}
+          }}
                 className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md transition-colors"
-              >
+        >
                 确认
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
     </div>
   );
 } 

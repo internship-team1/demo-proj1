@@ -255,8 +255,8 @@ const fetchQuizComments = async () => {
       const result = await response.json();
       
       if (response.ok) {
-        // 更新本地课程列表，移除已退出的课程
-        setCourses(courses.filter(course => course.id !== courseId));
+        // 更新本地课程列表，重新获取最新数据
+        fetchMySpeakerCourses(currentUser.id);
         setMessage("已成功退出课程");
       } else {
         setMessage(result.error || "退出课程失败");

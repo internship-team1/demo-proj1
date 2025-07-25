@@ -335,7 +335,7 @@ export default function CourseQuizPage() {
         setQuizEnded(true);
         setCanComment(true);
         setShowComments(true);
-        fetchComments(activeQuiz.id);
+      fetchComments(activeQuiz.id);
         fetchScoreAndRanking(activeQuiz.id, currentUser.id);
       } else {
         // 显示等待消息
@@ -442,16 +442,16 @@ export default function CourseQuizPage() {
               // 如果已结束，获取成绩和排名
               setQuizEnded(true);
               setShowResults(true);
-              setCanComment(true);
-              setShowComments(true);
-              fetchComments(quiz.id);
+                setCanComment(true);
+                setShowComments(true);
+                fetchComments(quiz.id);
               fetchScoreAndRanking(quiz.id, currentUser.id);
-            } else {
+              } else {
               // 如果未结束，仅显示等待消息
               setShowResults(true);
               const remainingMs = endTime!.getTime() - now.getTime();
-              const remainingSecs = Math.max(0, Math.floor(remainingMs / 1000));
-              setTimeRemaining(remainingSecs);
+                const remainingSecs = Math.max(0, Math.floor(remainingMs / 1000));
+                setTimeRemaining(remainingSecs);
             }
             return;
           }
@@ -552,66 +552,66 @@ export default function CourseQuizPage() {
                         <p className="text-gray-700 text-lg font-medium">
                           第 {userRanking.rank} 名
                           {rankings.length > 1 && <span className="text-sm text-gray-500 ml-2">(共 {rankings.length} 人)</span>}
-                        </p>
+                  </p>
                       </>
                     )}
-                  </div>
+                </div>
                   
                   {/* 移除排名显示独立区块 */}
                   
                   {/* 移除排行榜 */}
+              
+              {/* 问题回顾 */}
+              {activeQuiz.questions && activeQuiz.questions.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-xl font-semibold mb-4">测验回顾</h3>
                   
-                  {/* 问题回顾 */}
-                  {activeQuiz.questions && activeQuiz.questions.length > 0 && (
-                    <div className="mt-8">
-                      <h3 className="text-xl font-semibold mb-4">测验回顾</h3>
+                  <div className="space-y-6">
+                    {activeQuiz.questions.map((question, idx) => {
+                      const selectedOptionId = selectedAnswers[question.id];
+                      const correctOption = question.options.find(opt => opt.isCorrect);
+                      const isCorrect = selectedOptionId !== undefined && correctOption && selectedOptionId === correctOption.id;
                       
-                      <div className="space-y-6">
-                        {activeQuiz.questions.map((question, idx) => {
-                          const selectedOptionId = selectedAnswers[question.id];
-                          const correctOption = question.options.find(opt => opt.isCorrect);
-                          const isCorrect = selectedOptionId !== undefined && correctOption && selectedOptionId === correctOption.id;
-                          
-                          return (
-                            <div key={question.id} className="pb-4">
-                              <h4 className="font-medium mb-3">{question.content}</h4>
-                              <div className="space-y-2">
-                                {question.options.map(option => (
-                                  <div 
-                                    key={option.id} 
-                                    className={`p-3 rounded-md border ${
-                                      option.isCorrect ? 'border-green-500 bg-green-50' : 
-                                      selectedOptionId === option.id ? 'border-red-500 bg-red-50' : 
-                                      'border-gray-200'
-                                    }`}
-                                  >
-                                    <div className="flex items-center">
-                                      <span className={`inline-block w-6 h-6 rounded-full mr-2 text-center flex items-center justify-center ${
-                                        option.isCorrect ? 'bg-green-500 text-white' : 
-                                        selectedOptionId === option.id ? 'bg-red-500 text-white' : 
-                                        'bg-gray-100 text-gray-700'
-                                      }`}>
-                                        {String.fromCharCode(65 + idx % 26)}
-                                      </span>
-                                      <span className="flex-grow">{option.content}</span>
-                                      {option.isCorrect && (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
-                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                        </svg>
-                                      )}
-                                      {selectedOptionId === option.id && !option.isCorrect && (
-                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
-                                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                                        </svg>
-                                      )}
-                                    </div>
-                                  </div>
-                                ))}
+                      return (
+                        <div key={question.id} className="pb-4">
+                          <h4 className="font-medium mb-3">{question.content}</h4>
+                          <div className="space-y-2">
+                            {question.options.map(option => (
+                              <div 
+                                key={option.id} 
+                                className={`p-3 rounded-md border ${
+                                  option.isCorrect ? 'border-green-500 bg-green-50' : 
+                                  selectedOptionId === option.id ? 'border-red-500 bg-red-50' : 
+                                  'border-gray-200'
+                                }`}
+                              >
+                                <div className="flex items-center">
+                                  <span className={`inline-block w-6 h-6 rounded-full mr-2 text-center flex items-center justify-center ${
+                                    option.isCorrect ? 'bg-green-500 text-white' : 
+                                    selectedOptionId === option.id ? 'bg-red-500 text-white' : 
+                                    'bg-gray-100 text-gray-700'
+                                  }`}>
+                                    {String.fromCharCode(65 + idx % 26)}
+                                  </span>
+                                  <span className="flex-grow">{option.content}</span>
+                                  {option.isCorrect && (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                  {selectedOptionId === option.id && !option.isCorrect && (
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                                    </svg>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                     </div>
                   )}
                 </>
@@ -809,49 +809,49 @@ export default function CourseQuizPage() {
                 const isCompleted = quiz.isActive && endTime && now > endTime;
                 
                 return (
-                  <div key={quiz.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-xl font-medium text-gray-800">{quiz.title}</h3>
-                        {quiz.description && (
-                          <p className="text-gray-600 mt-1">{quiz.description}</p>
-                        )}
-                      </div>
+              <div key={quiz.id} className="p-6 bg-white rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative overflow-hidden">
+                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-300 via-gray-400 to-gray-300"></div>
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 className="text-xl font-medium text-gray-800">{quiz.title}</h3>
+                    {quiz.description && (
+                      <p className="text-gray-600 mt-1">{quiz.description}</p>
+                    )}
+                  </div>
                       <span className={`px-2 py-1 text-xs rounded ${
                         isActive ? "bg-green-100 text-green-800 border border-green-200" : 
                         "bg-blue-100 text-blue-800 border border-blue-200"
                       }`}>
                         {isActive ? "进行中" : "已结束"}
-                      </span>
-                    </div>
-                    
-                    {quiz.startTime && quiz.endTime && (
-                      <div className="flex space-x-4 text-sm text-gray-500 mb-4">
-                        <span>开始: {new Date(quiz.startTime).toLocaleString()}</span>
-                        <span>结束: {new Date(quiz.endTime).toLocaleString()}</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex space-x-4">
+                  </span>
+                </div>
+                
+                {quiz.startTime && quiz.endTime && (
+                  <div className="flex space-x-4 text-sm text-gray-500 mb-4">
+                    <span>开始: {new Date(quiz.startTime).toLocaleString()}</span>
+                    <span>结束: {new Date(quiz.endTime).toLocaleString()}</span>
+                  </div>
+                )}
+                
+                <div className="flex space-x-4">
                       {isActive && (
-                        <button 
-                          className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300"
+                  <button 
+                    className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-800 rounded-md transition-colors border border-gray-300"
                           onClick={() => handleStartQuiz(quiz)}
-                        >
-                          开始答题
-                        </button>
+                  >
+                    开始答题
+                  </button>
                       )}
                       {isCompleted && (
-                        <button 
-                          className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-600 rounded-md transition-colors border border-gray-300"
+                  <button 
+                    className="py-2 px-4 bg-transparent hover:bg-gray-100 text-gray-600 rounded-md transition-colors border border-gray-300"
                           onClick={() => handleViewResults(quiz)}
-                        >
-                          查看结果
-                        </button>
+                  >
+                    查看结果
+                  </button>
                       )}
-                    </div>
-                  </div>
+                </div>
+              </div>
                 );
               })}
           </div>
