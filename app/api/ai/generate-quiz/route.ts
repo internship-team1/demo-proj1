@@ -730,24 +730,27 @@ export async function POST(request: NextRequest) {
       contentPreview: content?.substring(0, 100) || '无内容'
     });
     
+    // 强制检查：如果没有filename或fileType，直接报错
+    if (!filename && !fileType) {
+      console.error("❌ 缺少关键参数：filename和fileType都为空");
+      return NextResponse.json({
+        error: "缺少必要参数：文件名或文件类型"
+      }, { status: 400 });
+    }
+    
     // 特殊处理PPT文件 - 使用题库抽取（优先级最高，不依赖内容提取结果）
-    const isPpt = fileType?.toLowerCase() === 'ppt' || fileType?.toLowerCase() === 'pptx' || 
-                  fileType?.toLowerCase() === '.ppt' || fileType?.toLowerCase() === '.pptx' ||
-                  filename?.toLowerCase().endsWith('.ppt') || filename?.toLowerCase().endsWith('.pptx') ||
-                  filename?.toLowerCase().includes('ppt');
+    // 简化检测逻辑，确保捕获所有PPT文件
+    const fileTypeStr = String(fileType || '').toLowerCase();
+    const filenameStr = String(filename || '').toLowerCase();
+    const isPpt = fileTypeStr.includes('ppt') || filenameStr.includes('.ppt');
     
     console.log("PPT检测结果:", {
       isPpt,
-      fileType: fileType?.toLowerCase(),
-      filename: filename?.toLowerCase(),
+      fileTypeStr,
+      filenameStr,
       检测条件: {
-        fileType_ppt: fileType?.toLowerCase() === 'ppt',
-        fileType_pptx: fileType?.toLowerCase() === 'pptx',
-        fileType_dot_ppt: fileType?.toLowerCase() === '.ppt',
-        fileType_dot_pptx: fileType?.toLowerCase() === '.pptx',
-        filename_endswith_ppt: filename?.toLowerCase().endsWith('.ppt'),
-        filename_endswith_pptx: filename?.toLowerCase().endsWith('.pptx'),
-        filename_includes_ppt: filename?.toLowerCase().includes('ppt')
+        fileType包含ppt: fileTypeStr.includes('ppt'),
+        filename包含ppt: filenameStr.includes('.ppt')
       }
     });
     
@@ -783,7 +786,8 @@ export async function POST(request: NextRequest) {
     }
     
     // 特殊处理PDF文件 - 只使用文件名，不使用内容
-    const isPdf = fileType?.toLowerCase() === 'pdf' || filename?.toLowerCase().endsWith('.pdf');
+    const isPdf = fileType?.toLowerCase() === 'pdf' || fileType?.toLowerCase() === '.pdf' || 
+                  filename?.toLowerCase().endsWith('.pdf');
     
     // 特殊处理文件名为"4-16"的PDF文件
     const isSpecialPdf = isPdf && (filename === "4-16" || filename === "4-16.pdf");
