@@ -259,10 +259,29 @@ export async function POST(request: NextRequest) {
         }
       }
       // 处理PowerPoint文件
-      else if (fileExtension === '.pptx') {
+      else if (fileExtension === '.ppt' || fileExtension === '.pptx') {
         try {
-          console.log("开始处理PPTX文件...");
+          console.log(`开始处理PowerPoint文件: ${fileExtension}...`);
           let pptContent = "";
+          
+          // 只处理.pptx格式，.ppt格式需要不同的处理方法
+          if (fileExtension === '.ppt') {
+            console.warn("暂不支持.ppt格式，请使用.pptx格式");
+            content = `
+文件名: ${fileName}
+文件类型: PowerPoint演示文稿 (.ppt格式)
+文件大小: ${Math.round(buffer.length / 1024)} KB
+
+暂不支持.ppt格式文件。请将文件另存为.pptx格式后重新上传。
+
+转换方法:
+1. 在PowerPoint中打开该文件
+2. 点击"文件" -> "另存为"
+3. 选择文件格式为"PowerPoint演示文稿(.pptx)"
+4. 保存并重新上传
+            `;
+            return NextResponse.json({ content });
+          }
           
           try {
             // 使用adm-zip解压并提取PPTX内容
@@ -300,16 +319,46 @@ export async function POST(request: NextRequest) {
               for (const slideFile of slideFiles) {
                 try {
                   const slideContent = fs.readFileSync(path.join(slidesDir, slideFile), 'utf8');
-                  // 提取文本内容（匹配所有<a:t>标签中的内容）
-                  const textMatches = slideContent.match(/<a:t>([^<]+)<\/a:t>/g) || [];
-                  const texts = textMatches.map(match => {
-                    const textMatch = match.match(/<a:t>([^<]+)<\/a:t>/);
-                    return textMatch ? textMatch[1].trim() : '';
-                  }).filter(text => text.length > 0);
                   
-                  if (texts.length > 0) {
-                    // 直接追加文本内容，不添加"幻灯片 X:"前缀
-                    slideContents.push(texts.join('\n'));
+                  // 多种文本提取模式
+                  let texts = [];
+                  
+                  // 模式1: 提取<a:t>标签中的内容
+                  const aTextMatches = slideContent.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || [];
+                  texts.push(...aTextMatches.map(match => {
+                    const textMatch = match.match(/<a:t[^>]*>([^<]+)<\/a:t>/);
+                    return textMatch ? textMatch[1].trim() : '';
+                  }).filter(text => text.length > 0));
+                  
+                  // 模式2: 提取<t>标签中的内容（有些PPT使用这种格式）
+                  const tTextMatches = slideContent.match(/<t[^>]*>([^<]+)<\/t>/g) || [];
+                  texts.push(...tTextMatches.map(match => {
+                    const textMatch = match.match(/<t[^>]*>([^<]+)<\/t>/);
+                    return textMatch ? textMatch[1].trim() : '';
+                  }).filter(text => text.length > 0));
+                  
+                  // 模式3: 提取纯文本节点（更宽泛的匹配）
+                  if (texts.length === 0) {
+                    const allTextMatches = slideContent.match(/>([^<>]+)</g) || [];
+                    const filteredTexts = allTextMatches
+                      .map(match => match.replace(/^>|<$/g, '').trim())
+                      .filter(text => 
+                        text.length > 2 && 
+                        !text.match(/^[0-9.]+$/) && 
+                        !text.match(/^[a-zA-Z]{1,3}$/) &&
+                        text.includes(' ') || text.match(/[\u4e00-\u9fa5]/)
+                      );
+                    texts.push(...filteredTexts);
+                  }
+                  
+                  // 去重并过滤
+                  const uniqueTexts = [...new Set(texts)].filter(text => text.length > 1);
+                  
+                  if (uniqueTexts.length > 0) {
+                    slideContents.push(uniqueTexts.join('\n'));
+                    console.log(`幻灯片 ${slideFile} 提取到 ${uniqueTexts.length} 个文本片段`);
+                  } else {
+                    console.warn(`幻灯片 ${slideFile} 未找到文本内容`);
                   }
                 } catch (slideError) {
                   console.error(`处理幻灯片 ${slideFile} 失败:`, slideError);
@@ -317,9 +366,22 @@ export async function POST(request: NextRequest) {
               }
               
               pptContent = slideContents.join('\n\n');
-              console.log(`成功提取PowerPoint内容，长度: ${pptContent.length}`);
+              console.log(`成功提取PowerPoint内容，总长度: ${pptContent.length} 字符，来自 ${slideContents.length} 张幻灯片`);
             } else {
               console.warn("未找到幻灯片目录:", slidesDir);
+              
+              // 尝试备用方法：直接查找XML文件
+              try {
+                const allFiles = fs.readdirSync(extractDir, { recursive: true });
+                console.log("解压文件列表:", allFiles.slice(0, 20)); // 只显示前20个文件
+                
+                const xmlFiles = allFiles.filter(file => 
+                  typeof file === 'string' && file.includes('slide') && file.endsWith('.xml')
+                );
+                console.log("找到的XML文件:", xmlFiles);
+              } catch (listError) {
+                console.error("列出解压文件失败:", listError);
+              }
             }
             
             // 尝试从presentation.xml提取标题等信息
@@ -341,23 +403,33 @@ export async function POST(request: NextRequest) {
             console.error("PPTX解压或解析失败:", zipError);
           }
           
-          // 如果没有提取到内容，提供文件信息
+          // 检查提取结果并提供详细反馈
           if (!pptContent || pptContent.trim().length < 20) {
+            console.warn(`PowerPoint内容提取不足，长度: ${pptContent ? pptContent.length : 0}`);
             const fileInfo = `
 文件名: ${fileName}
-文件类型: PowerPoint演示文稿
+文件类型: PowerPoint演示文稿 (.pptx)
 文件大小: ${Math.round(buffer.length / 1024)} KB
 
-无法提取PowerPoint文本内容，可能是以下原因:
-1. 演示文稿可能主要包含图像而非文本
-2. 演示文稿格式可能不兼容或特殊
-3. 文件可能已损坏或格式错误
+提取到的内容长度: ${pptContent ? pptContent.length : 0} 字符
 
-建议:
-请检查PowerPoint文件内容是否主要为文本。
+无法提取足够的PowerPoint文本内容，可能的原因:
+1. 演示文稿主要包含图像、图表而非文本
+2. 文本以特殊格式存储（如文本框、艺术字等）
+3. 文件可能使用了不标准的XML结构
+4. 文件可能已损坏或格式异常
+
+建议解决方案:
+1. 检查PPT是否包含足够的纯文本内容
+2. 尝试在PowerPoint中另存为新的.pptx文件
+3. 确保文本不是以图片形式嵌入的
+4. 考虑将内容复制到Word文档中再上传
+
+提取到的部分内容: ${pptContent ? pptContent.substring(0, 200) + '...' : '无'}
             `;
             content = fileInfo;
           } else {
+            console.log(`PowerPoint内容提取成功，总长度: ${pptContent.length} 字符`);
             content = pptContent;
           }
         } catch (error: any) {
