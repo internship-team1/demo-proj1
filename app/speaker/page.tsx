@@ -165,13 +165,13 @@ export default function SpeakerPage() {
       setCurrentUser(user);
       setNewUsername(user.username);
       
+      // 加载当前用户担任演讲者的课程
+      fetchMySpeakerCourses(user.id);
+      
       // 登录后立即检查统计通知
       checkNewStatisticsNotification();
       const interval = setInterval(checkNewStatisticsNotification, 30000);
       return () => clearInterval(interval);
-      
-      // 加载当前用户担任演讲者的课程
-      fetchMySpeakerCourses(user.id);
     } catch (error) {
       localStorage.removeItem('currentUser');
       router.push("/");
@@ -209,18 +209,35 @@ const fetchQuizComments = async () => {
 };
   
   const fetchMySpeakerCourses = async (userId: number) => {
-  try {
-    // 获取课程基础信息+详情
-    const response = await fetch(`/api/courses/with-details?speakerId=${userId}`);
-    if (!response.ok) throw new Error("获取课程列表失败");
+    if (!userId) {
+      console.error("获取课程失败: 用户ID无效");
+      return;
+    }
     
-    const coursesData = await response.json();
-    setCourses(coursesData);
-  } catch (error) {
-    console.error("获取课程失败:", error);
-    setMessage("获取课程列表失败");
-  }
-};
+    console.log("正在获取演讲者课程，用户ID:", userId);
+    
+    try {
+      // 获取课程基础信息+详情
+      const response = await fetch(`/api/courses/with-details?speakerId=${userId}`);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "获取课程列表失败");
+      }
+      
+      const coursesData = await response.json();
+      console.log("获取到演讲者课程数据:", coursesData);
+      
+      setCourses(coursesData);
+    } catch (error) {
+      console.error("获取课程失败:", error);
+      setMessage("获取课程列表失败，请刷新页面重试");
+      
+      // 3秒后清除错误消息
+      setTimeout(() => {
+        setMessage("");
+      }, 3000);
+    }
+  };
 
   const handleDeleteCourse = (id: number) => {
     setCourses(courses.filter(course => course.id !== id));

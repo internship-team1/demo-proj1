@@ -97,7 +97,11 @@ export async function POST(request: Request) {
           include: {
             organizer: {
               select: { username: true }
-            }
+            },
+            speaker: {
+              select: { username: true }
+            },
+            _count: { select: { members: true } }
           }
         }
       }
@@ -109,7 +113,9 @@ export async function POST(request: Request) {
         id: enrollment.course.id,
         title: enrollment.course.title,
         courseCode: enrollment.course.courseCode,
-        organizer: enrollment.course.organizer.username
+        organizer: enrollment.course.organizer.username,
+        speaker: enrollment.course.speaker?.username || null,
+        audienceCount: enrollment.course._count.members
       }
     })
 
