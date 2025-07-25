@@ -721,29 +721,61 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { content, filename, fileType } = body;
     
+    // 添加详细的调试日志
+    console.log("=== PPT出题调试开始 ===");
+    console.log("请求体参数:", { 
+      filename, 
+      fileType, 
+      contentLength: content?.length || 0,
+      contentPreview: content?.substring(0, 100) || '无内容'
+    });
+    
     // 特殊处理PPT文件 - 使用题库抽取（优先级最高，不依赖内容提取结果）
     const isPpt = fileType?.toLowerCase() === 'ppt' || fileType?.toLowerCase() === 'pptx' || 
+                  fileType?.toLowerCase() === '.ppt' || fileType?.toLowerCase() === '.pptx' ||
                   filename?.toLowerCase().endsWith('.ppt') || filename?.toLowerCase().endsWith('.pptx') ||
                   filename?.toLowerCase().includes('ppt');
     
+    console.log("PPT检测结果:", {
+      isPpt,
+      fileType: fileType?.toLowerCase(),
+      filename: filename?.toLowerCase(),
+      检测条件: {
+        fileType_ppt: fileType?.toLowerCase() === 'ppt',
+        fileType_pptx: fileType?.toLowerCase() === 'pptx',
+        fileType_dot_ppt: fileType?.toLowerCase() === '.ppt',
+        fileType_dot_pptx: fileType?.toLowerCase() === '.pptx',
+        filename_endswith_ppt: filename?.toLowerCase().endsWith('.ppt'),
+        filename_endswith_pptx: filename?.toLowerCase().endsWith('.pptx'),
+        filename_includes_ppt: filename?.toLowerCase().includes('ppt')
+      }
+    });
+    
     // 如果是PPT文件，直接从创新课题库中随机抽取5道题目，不管内容提取是否成功
     if (isPpt) {
-      console.log("检测到PPT文件，从创新课题库中抽取题目:", filename);
+      console.log("✅ 检测到PPT文件，从创新课题库中抽取题目:", filename);
       
       try {
+        console.log("题库状态检查:", {
+          题库是否存在: !!PPT_INNOVATION_QUESTION_BANK,
+          题库长度: PPT_INNOVATION_QUESTION_BANK?.length || 0,
+          题库前3个题目: PPT_INNOVATION_QUESTION_BANK?.slice(0, 3).map(q => q.question.substring(0, 30)) || []
+        });
+        
         // 验证题库是否可用
         if (!PPT_INNOVATION_QUESTION_BANK || PPT_INNOVATION_QUESTION_BANK.length === 0) {
-          console.error("PPT创新题库为空或未正确加载");
+          console.error("❌ PPT创新题库为空或未正确加载");
           throw new Error("PPT题库未正确加载");
         }
         
         // 从PPT创新课题库中随机抽取5道题目
         const selectedQuestions = getRandomPPTQuestions(5);
         
-        console.log(`成功从PPT题库中抽取${selectedQuestions.length}道题目`);
+        console.log(`✅ 成功从PPT题库中抽取${selectedQuestions.length}道题目`);
+        console.log("抽取的题目:", selectedQuestions.map(q => q.question.substring(0, 50)));
         return NextResponse.json({ questions: selectedQuestions });
       } catch (pptError: any) {
-        console.error("PPT题库处理失败:", pptError);
+        console.error("❌ PPT题库处理失败:", pptError);
         return NextResponse.json({
           error: `PPT文件题库处理失败: ${pptError.message}`
         }, { status: 500 });
@@ -833,10 +865,12 @@ export async function POST(request: NextRequest) {
     }
 
   } catch (error: any) {
-    console.error("生成测验失败:", error);
+    console.error("❌ 生成测验失败:", error);
+    console.error("错误堆栈:", error.stack);
     // 出现任何错误，直接返回错误信息
     return NextResponse.json({
-      error: error.message || "生成测验题目时出现未知错误"
+      error: error.message || "生成测验题目时出现未知错误",
+      details: error.stack?.substring(0, 500) || "无详细信息"
     }, { status: 500 });
   }
 }
